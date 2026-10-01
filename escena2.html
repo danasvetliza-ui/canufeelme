@@ -1,0 +1,4382 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Can U Feel Me? — Escena 2</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap');
+        *, *::before, *::after { margin:0; padding:0; box-sizing:border-box; }
+        html, body { width:100%; height:100%; overflow:hidden; background:#0d0018; }
+
+        /* ═══════════════════════════════════════════════════════
+           CURSOR PERSONALIZADO — manito 2D dibujito, humana
+           Dedo índice apuntando, mano con calidez.
+           Hotspot en la punta del índice: 16 1
+        ═══════════════════════════════════════════════════════ */
+        /* Cursor UX — estilo poético. Usamos un cursor de sistema para pointer 
+           pero con feedback visual fuerte en el CSS */
+        .cur-hand { cursor: pointer !important; }
+        .cur-hand:hover { cursor: pointer !important; }
+
+        /* ═══════════════════════════════════════════════════════
+           ESCENA — stage fijo 1920×1080, escalado al viewport
+        ═══════════════════════════════════════════════════════ */
+        #s2 {
+            position: fixed;
+            inset: 0;
+            overflow: hidden;
+            background: #0d0018; /* fondo base de la escena */
+        }
+
+        #cinematic-vignette {
+            position: absolute; inset: 0; z-index: 5;
+            pointer-events: none !important;
+            background: radial-gradient(circle at 50% 50%, rgba(0,0,0,0) 35%, rgba(6, 1, 16, 0.40) 80%, rgba(3, 0, 10, 0.70) 100%);
+            transition: opacity 1.5s ease, background 1.5s ease;
+        }
+        #s2.zoomed #cinematic-vignette {
+            background: radial-gradient(circle at 50% 50%, rgba(0,0,0,0) 18%, rgba(6, 1, 16, 0.65) 65%, rgba(3, 0, 10, 0.92) 100%);
+        }
+
+        #s2-stage {
+            position: absolute;
+            top: 50%; left: 50%;
+            width: 1920px; height: 1080px;
+            z-index: 20;
+            /* Fallback CSS para que esté centrado; JS luego añade translate y scale */
+            transform: translate(-50%, -50%);
+        }
+
+        /* Zoomer: hace el zoom cinematográfico hacia la almohada.
+           transform-origin apunta al centro de la almohada/cabecera
+           de la cama en el espacio de diseño. */
+        #s2-zoomer {
+            position: absolute;
+            inset: 0;
+            will-change: transform;
+            /* Renderizado de alta calidad durante el zoom */
+            -webkit-backface-visibility: hidden;
+            backface-visibility: hidden;
+            transform-style: preserve-3d;
+        }
+
+        /* ── Layers ── */
+        .layer {
+            position: absolute;
+            pointer-events: none;
+            user-select: none;
+            display: block;
+            /* Trucos para mantener 4K/Crispness en el zoom */
+            image-rendering: high-quality;
+            -webkit-font-smoothing: antialiased;
+            transform: translateZ(0);
+        }
+
+        /* Fondo — habitación sin muebles */
+        #l-fondo {
+            top: 0; left: 0;
+            width: 1920px; height: 1080px;
+            object-fit: cover;
+            z-index: 1;
+        }
+
+        /* ── POSICIONAMIENTO DE ASSETS ──
+           La cama va en la esquina inferior-izquierda del stage,
+           con la cabecera visible en la parte superior de la cama.
+           La cama.png muestra la cama en perspectiva 3/4.
+           El pie de la cama toca el borde inferior-izquierdo.
+
+           Cama.png tiene la cabecera (headboard) en la zona
+           superior-derecha del asset (perspectiva 3/4 frontal).
+
+           Colocamos la cama grande para que:
+           - La parte inferior-izquierda toque el borde del stage
+           - La cabecera quede visible en la zona superior de la cama
+        */
+
+        #l-cama {
+            z-index: 2;
+            left: -90px;
+            top: 590px;
+            width: 820px;
+            height: auto;
+        }
+
+        /* Almohada — en la cabecera (zona superior de la cama).
+           La cabecera de cama.png está en el sector
+           superior-central del asset al 75-85% de su ancho.
+           Con cama en left=-90, top=590, width=820:
+           - Cabecera x aprox: -90 + 820*0.80 = 566px
+           - Cabecera y aprox: 590 + 459*0.12 = 645px
+           Posicionamos la almohada sobre esa área. */
+        #l-almohada {
+            z-index: 4;
+            left: 355px;
+            top: 580px;
+            width: 270px;
+            height: auto;
+            transition: opacity 1.1s ease;
+        }
+
+        /* Remedio — SIEMPRE debajo de la almohada (z:3 < z:4).
+           Acostado, más arriba, más al centro de la parte superior de la cama.
+           Casi todo tapado por la almohada. */
+        #l-remedio {
+            z-index: 3;
+            left: 430px;
+            top: 628px;
+            width: 64px;
+            height: auto;
+            opacity: 0;
+            transition: opacity 1.3s ease;
+            transform: rotate(82deg);
+            transform-origin: center center;
+        }
+
+        /* ══════════════════════════════════════════════
+           HOTSPOTS invisibles
+        ══════════════════════════════════════════════ */
+        .hotspot {
+            position: absolute;
+            background: rgba(0, 0, 0, 0.001);
+            pointer-events: none !important;
+            z-index: 20;
+        }
+        .hotspot.active {
+            pointer-events: auto !important;
+            cursor: pointer !important;
+        }
+
+        /* Cama: cubre toda la zona de la cama */
+        #hs-cama {
+            left: -90px; top: 590px;
+            width: 820px; height: 460px;
+        }
+        /* Almohada */
+        #hs-almohada {
+            left: 330px; top: 555px;
+            width: 320px; height: 230px;
+        }
+        /* Remedio — hotspot cubre el frasco acostado y su zona visible */
+        #hs-remedio {
+            left: 388px; top: 608px;
+            width: 165px; height: 175px;
+        }
+
+        /* ══════════════════════════════════════════════
+           ANIMACIÓN — CAMA: RESPIRACIÓN LENTA
+           Pulsación visible para guiar al usuario (UX estético).
+        ══════════════════════════════════════════════ */
+        @keyframes unifiedBreathe {
+            0%, 100% { filter: brightness(1.02) drop-shadow(0 0 6px rgba(180,140,255,0.20)); }
+            50%      { filter: brightness(1.22) drop-shadow(0 0 22px rgba(195,155,255,0.55)); }
+        }
+        @keyframes unifiedBreatheHvr {
+            0%, 100% { filter: brightness(1.15) drop-shadow(0 0 12px rgba(190,150,255,0.40)); }
+            50%      { filter: brightness(1.35) drop-shadow(0 0 32px rgba(215,175,255,0.80)); }
+        }
+        #l-cama.breathing        { animation: unifiedBreathe    3.2s ease-in-out infinite; cursor: pointer !important; pointer-events: auto !important; }
+        #l-cama.breathing.hvr    { animation: unifiedBreatheHvr 2.0s ease-in-out infinite; cursor: pointer !important; }
+        #l-cama.stop-anim {
+            animation: none;
+            filter: brightness(1.1);
+            transition: filter 1.6s ease;
+        }
+
+        /* ══════════════════════════════════════════════
+           ANIMACIÓN — ALMOHADA: DESTELLO LUMINOSO
+        ══════════════════════════════════════════════ */
+        @keyframes pillowGlow {
+            0%, 100% { filter: brightness(1.1) drop-shadow(0 0 15px rgba(220,180,255,0.6)); }
+            50%      { filter: brightness(1.6) saturate(1.3) drop-shadow(0 0 45px rgba(235,190,255,1)) drop-shadow(0 0 80px rgba(180,120,255,0.8)); }
+        }
+        @keyframes pillowGlowHvr {
+            0%, 100% { filter: brightness(1.3) drop-shadow(0 0 25px rgba(230,180,255,0.8)); }
+            50%      { filter: brightness(1.8) saturate(1.4) drop-shadow(0 0 65px rgba(255,210,255,1)) drop-shadow(0 0 100px rgba(200,130,255,0.9)); }
+        }
+        #l-almohada.glowing      { animation: pillowGlow    3.0s ease-in-out infinite; cursor: pointer !important; pointer-events: auto !important; }
+        #l-almohada.glowing.hvr  { animation: pillowGlowHvr 2.1s ease-in-out infinite; cursor: pointer !important; }
+
+        /* ══════════════════════════════════════════════
+           ANIMACIÓN — REMEDIO: LATIDO CÁLIDO NARANJA
+        ══════════════════════════════════════════════ */
+        @keyframes remedioHeartbeat {
+            0%, 100% { filter: brightness(1.1) drop-shadow(0 0 12px rgba(255,165,50,0.5)); }
+            42%      { filter: brightness(1.5) drop-shadow(0 0 35px rgba(255,165,50,0.95)) drop-shadow(0 0 70px rgba(255,120,0,0.7)); }
+            62%      { filter: brightness(1.3) drop-shadow(0 0 20px rgba(255,165,50,0.7)); }
+        }
+        @keyframes remedioHbHvr {
+            0%, 100% { filter: brightness(1.3) drop-shadow(0 0 25px rgba(255,165,50,0.8)); }
+            50%      { filter: brightness(1.8) drop-shadow(0 0 55px rgba(255,175,60,1)) drop-shadow(0 0 90px rgba(255,120,0,0.85)); }
+        }
+        #l-remedio.discovered      { animation: remedioHeartbeat 2.5s ease-in-out infinite; cursor: pointer !important; pointer-events: auto !important; }
+        #l-remedio.discovered.hvr  { animation: remedioHbHvr     1.9s ease-in-out infinite; cursor: pointer !important; }
+
+        /* ══════════════════════════════════════════════
+           REMEDIO FOREGROUND — para el zoom hacia cámara
+        ══════════════════════════════════════════════ */
+        #remedio-fg {
+            position: fixed;
+            z-index: 500;
+            pointer-events: none;
+            opacity: 0;
+            background: transparent; /* fondo transparente — se ve la habitación */
+            transform-origin: center center;
+            will-change: transform, opacity;
+        }
+        #remedio-fg img {
+            width: 100%; height: 100%;
+            object-fit: contain;
+            display: block;
+            background: transparent;
+        }
+
+        #remedio-spotlight {
+            position: fixed; inset: 0; z-index: 490;
+            background: radial-gradient(circle at 50% 50%, rgba(55, 20, 95, 0.50) 0%, rgba(13, 0, 24, 0.85) 60%, rgba(5, 0, 12, 0.96) 100%);
+            opacity: 0; pointer-events: none; display: none;
+            transition: opacity 1.4s ease;
+        }
+        #remedio-spotlight.visible { display: block; opacity: 1; }
+
+        @keyframes remedioGifFloat {
+            0%, 100% { transform: scale(1) translateY(0px); filter: drop-shadow(0 15px 35px rgba(160,110,255,0.25)) contrast(1.04) saturate(1.06) brightness(1.01); }
+            50%      { transform: scale(1.02) translateY(-10px); filter: drop-shadow(0 25px 45px rgba(190,140,255,0.45)) contrast(1.06) saturate(1.08) brightness(1.03); }
+        }
+        #remedio-gif.visible img {
+            animation: remedioGifFloat 4.5s ease-in-out infinite;
+        }
+
+        /* ══════════════════════════════════════════════
+           GIF FINAL — transparente, se ve la habitación
+        ══════════════════════════════════════════════ */
+        #remedio-gif {
+            position: fixed;
+            inset: 0;
+            z-index: 600;
+            background: transparent; /* SIN fondo — se ve la habitación */
+            opacity: 0;
+            pointer-events: none;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+        }
+        #remedio-gif.visible {
+            display: flex;
+            pointer-events: auto;
+        }
+        #remedio-gif img {
+            max-width: 90vw;
+            max-height: 90vh;
+            object-fit: contain;
+            background: transparent;
+            /* Renderizado de alta calidad + micro-sharpen */
+            image-rendering: -webkit-optimize-contrast;
+            image-rendering: high-quality;
+            filter: contrast(1.04) saturate(1.06) brightness(1.01);
+        }
+
+        /* Hint sutil para el click de retorno (aparece tarde, muy tenue) */
+        #return-hint {
+            position: fixed;
+            bottom: 40px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 610;
+            font-family: 'Georgia', serif;
+            font-style: italic;
+            font-size: 13px;
+            letter-spacing: 0.25em;
+            color: rgba(255,255,255,0.28);
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 2s ease;
+            user-select: none;
+        }
+        #return-hint.visible { opacity: 1; }
+
+        /* ══════════════════════════════════════════════
+           FADE DE ENTRADA — animación CSS pura
+           No depende del JS: se desvanece sola en 0.9s
+        ══════════════════════════════════════════════ */
+        @keyframes fadeOutIntro {
+            0%   { opacity: 1; }
+            100% { opacity: 0; pointer-events: none; }
+        }
+        #intro-fade {
+            position: fixed;
+            inset: 0;
+            background: #0d0018;
+            z-index: 900;
+            pointer-events: none !important;
+            opacity: 1;
+            animation: fadeOutIntro 0.9s ease 0.2s forwards;
+        }
+        #intro-fade.gone { opacity: 0 !important; animation: none !important; display: none !important; pointer-events: none !important; }
+
+        /* ══════════════════════════════════════════════
+           ESCENA 3 — ESCRITORIO, LÁMPARA, CUADERNO
+           Mismo cuarto, zona derecha. Activable luego
+           de la primera interacción con la cama.
+        ══════════════════════════════════════════════ */
+        #l-escritorio {
+            z-index: 2;
+            left: 862px; top: 540px;
+            width: 616px; height: auto;
+        }
+        #l-lampara {
+            z-index: 6;
+            left: 940px; top: 420px;
+            width: 320px; height: auto;
+            transition: filter 0.6s ease;
+        }
+        #l-lampara.lamp-hvr,
+        #l-lampara:hover {
+            filter: brightness(1.15) drop-shadow(0 0 16px rgba(255, 220, 160, 0.50));
+        }
+        #l-lampara.lamp-on {
+            filter: brightness(1.35) drop-shadow(0 0 35px rgba(255, 210, 150, 0.75));
+        }
+        #l-lampara.lamp-on.lamp-hvr,
+        #l-lampara.lamp-on:hover {
+            filter: brightness(1.45) drop-shadow(0 0 45px rgba(255, 225, 170, 0.90));
+        }
+
+
+        /* Biblioteca + libros — pared derecha, según imagen de referencia */
+        #l-biblioteca {
+            z-index: 3;
+            right: -80px;
+            top: 170px;
+            width: 640px;
+            height: auto;
+            filter: brightness(0.82) saturate(0.90);
+        }
+        /* Libros sueltos — estante del medio de la biblioteca */
+        #l-libros {
+            z-index: 4;
+            right: 55px;
+            top: 262px;
+            width: 245px;
+            height: auto;
+            filter: brightness(0.78) saturate(0.85);
+            transform: rotate(-3deg);
+            transform-origin: center bottom;
+        }
+        #l-cuaderno {
+            z-index: 4;
+            left: 1080px; top: 525px;
+            width: 148px; height: auto;
+            transform: rotate(6deg);
+            transform-origin: center center;
+            filter: brightness(0.78) saturate(0.88);
+            transition: filter 2.0s ease;
+        }
+
+        /* ══════════════════════════════════════════════
+           ANIMACIÓN — CUADERNO: DESTELLO / RESPIRACIÓN LUMINOSA
+        ══════════════════════════════════════════════ */
+        @keyframes cuadernoGlow {
+            0%, 100% { filter: brightness(1) drop-shadow(0 0 0px rgba(200,170,255,0)); }
+            50%       { filter: brightness(1.15) drop-shadow(0 0 12px rgba(200,170,255,0.25)); }
+        }
+        @keyframes cuadernoGlowHvr {
+            0%, 100% { filter: brightness(1.1) drop-shadow(0 0 6px rgba(210,180,255,0.30)); }
+            50%       { filter: brightness(1.25) drop-shadow(0 0 18px rgba(210,180,255,0.45)); }
+        }
+        #l-cuaderno.glowing      { animation: cuadernoGlow    3.0s ease-in-out infinite; cursor: pointer !important; pointer-events: auto !important; }
+        #l-cuaderno.glowing.hvr  { animation: cuadernoGlowHvr 2.0s ease-in-out infinite; cursor: pointer !important; }
+
+        /* Hotspots escritorio y lámpara */
+        #hs-escritorio {
+            left: 862px; top: 540px;
+            width: 490px; height: 390px;
+        }
+        #hs-lampara {
+            left: 950px; top: 410px;
+            width: 200px; height: 210px;
+        }
+        #hs-rayo {
+            left: 950px; top: 490px;
+            width: 460px; height: 200px;
+        }
+
+        @keyframes deskBreathe {
+            0%, 100% { filter: brightness(1) drop-shadow(0 0 0px rgba(155,120,240,0)); }
+            50%       { filter: brightness(1.10) drop-shadow(0 0 18px rgba(155,120,240,0.18)); }
+        }
+        #l-escritorio.s3-breathing     { animation: unifiedBreathe    3.2s ease-in-out infinite; cursor: pointer !important; pointer-events: auto !important; }
+        #l-escritorio.s3-breathing.hvr { animation: unifiedBreatheHvr 2.0s ease-in-out infinite; cursor: pointer !important; }
+        #l-escritorio.s3-stop {
+            animation: none;
+            filter: brightness(1);
+            transition: filter 1.4s ease;
+        }
+
+        /* Indicador de estado del rayo — eliminado */
+
+        /* Hotspot cuaderno */
+        #hs-cuaderno {
+            left: 1068px; top: 512px;
+            width: 175px; height: 220px;
+            transform: rotate(6deg);
+            transform-origin: center center;
+        }
+
+        /* ══════════════════════════════════════════════
+           CUADERNO VIEWER OVERLAY
+        ══════════════════════════════════════════════ */
+        #cuaderno-overlay {
+            position: fixed; inset: 0;
+            background: rgba(8, 2, 22, 0.55);
+            backdrop-filter: blur(14px) brightness(0.7);
+            -webkit-backdrop-filter: blur(14px) brightness(0.7);
+            z-index: 800;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            opacity: 0;
+            transition: opacity 0.5s ease;
+        }
+        #cuaderno-overlay.open    { display: flex; }
+        #cuaderno-overlay.visible { opacity: 1; }
+
+        #cuaderno-wrap {
+            position: relative;
+            width: 900px; height: 570px;
+            transform-origin: center center;
+        }
+
+        .c-layer {
+            position: absolute;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            display: none;       /* oculto hasta que JS asigne src */
+            object-fit: fill;
+            user-select: none;
+            -webkit-user-drag: none;
+            pointer-events: none;
+        }
+        .c-layer.loaded { display: block; }
+        #c-base    { z-index: 1; }
+        #c-current {
+            z-index: 2;
+            box-shadow: 0 24px 60px rgba(0,0,0,0.65), 0 4px 20px rgba(0,0,0,0.4);
+        }
+
+        /* The flipping element — JS sets all properties */
+        #c-flip {
+            position: absolute;
+            top: 0; height: 100%;
+            z-index: 5;
+            pointer-events: none;
+            display: none;
+            overflow: hidden;
+            background-size: 200% 100%;
+        }
+
+        /* Flip keyframe animations */
+        @keyframes cCollapseRight {
+            0%   { transform: perspective(1400px) rotateY(0deg);
+                   box-shadow: 2px 0 0 rgba(0,0,0,0); }
+            55%  { transform: perspective(1400px) rotateY(-55deg);
+                   box-shadow: -22px 0 38px rgba(0,0,0,0.30); }
+            100% { transform: perspective(1400px) rotateY(-90deg);
+                   box-shadow: -4px 0 6px rgba(0,0,0,0.10); }
+        }
+        @keyframes cUnfoldLeft {
+            0%   { transform: perspective(1400px) rotateY(90deg);
+                   box-shadow: 4px 0 6px rgba(0,0,0,0.10); }
+            45%  { transform: perspective(1400px) rotateY(28deg);
+                   box-shadow: 22px 0 38px rgba(0,0,0,0.30); }
+            100% { transform: perspective(1400px) rotateY(0deg);
+                   box-shadow: 2px 0 0 rgba(0,0,0,0); }
+        }
+        @keyframes cCollapseLeft {
+            0%   { transform: perspective(1400px) rotateY(0deg);
+                   box-shadow: -2px 0 0 rgba(0,0,0,0); }
+            55%  { transform: perspective(1400px) rotateY(55deg);
+                   box-shadow: 22px 0 38px rgba(0,0,0,0.30); }
+            100% { transform: perspective(1400px) rotateY(90deg);
+                   box-shadow: 4px 0 6px rgba(0,0,0,0.10); }
+        }
+        @keyframes cUnfoldRight {
+            0%   { transform: perspective(1400px) rotateY(-90deg);
+                   box-shadow: -4px 0 6px rgba(0,0,0,0.10); }
+            45%  { transform: perspective(1400px) rotateY(-28deg);
+                   box-shadow: -22px 0 38px rgba(0,0,0,0.30); }
+            100% { transform: perspective(1400px) rotateY(0deg);
+                   box-shadow: -2px 0 0 rgba(0,0,0,0); }
+        }
+
+        /* Click zones */
+        #c-zone-left, #c-zone-right {
+            position: absolute;
+            top: 0; width: 50%; height: 100%;
+            z-index: 20;
+            cursor: pointer;
+        }
+        #c-zone-left  { left: 0; }
+        #c-zone-right { right: 0; }
+
+        /* Arrow hints */
+        #c-zone-left::after, #c-zone-right::after {
+            content: '';
+            position: absolute;
+            top: 0; bottom: 0;
+            width: 60px;
+            opacity: 0;
+            transition: opacity 0.35s ease;
+            pointer-events: none;
+        }
+        #c-zone-left::after {
+            left: 0;
+            background: linear-gradient(to right, rgba(255,255,255,0.06), transparent);
+        }
+        #c-zone-right::after {
+            right: 0;
+            background: linear-gradient(to left, rgba(255,255,255,0.06), transparent);
+        }
+        #c-zone-left:hover::after,
+        #c-zone-right:hover::after { opacity: 1; }
+
+        #c-arrow-l, #c-arrow-r {
+            position: absolute;
+            top: 50%; transform: translateY(-50%);
+            z-index: 21;
+            font-size: 44px;
+            line-height: 1;
+            color: rgba(255,255,255,0.08);
+            pointer-events: none;
+            transition: color 0.3s ease;
+            user-select: none;
+            opacity: 0;  /* oculto hasta que JS abra el cuaderno */
+            transition: opacity 0.4s ease, color 0.3s ease;
+        }
+        #cuaderno-wrap.ready #c-arrow-l,
+        #cuaderno-wrap.ready #c-arrow-r { opacity: 1; }
+        #c-arrow-l { left: 10px; }
+        #c-arrow-r { right: 10px; }
+        #c-zone-left:hover  ~ #c-arrow-l { color: rgba(255,255,255,0.32); }
+        #c-zone-right:hover ~ #c-arrow-r { color: rgba(255,255,255,0.32); }
+
+        /* Page counter */
+        #c-counter {
+            position: absolute;
+            bottom: -30px; left: 50%;
+            transform: translateX(-50%);
+            color: rgba(255,255,255,0.20);
+            font-family: 'Georgia', serif;
+            font-style: italic;
+            font-size: 12px;
+            letter-spacing: 0.22em;
+            white-space: nowrap;
+            pointer-events: none;
+            user-select: none;
+            opacity: 0;  /* oculto hasta que JS abra el cuaderno */
+            transition: opacity 0.4s ease;
+        }
+        #cuaderno-wrap.ready #c-counter { opacity: 1; }
+
+        /* Close button */
+        #c-close {
+            position: fixed;
+            top: 22px; right: 28px;
+            z-index: 820;
+            background: none; border: none; outline: none;
+            color: rgba(255,255,255,0.28);
+            font-size: 22px;
+            cursor: pointer;
+            line-height: 1;
+            padding: 10px;
+            transition: color 0.2s ease, transform 0.2s ease;
+        }
+        #c-close:hover {
+            color: rgba(255,255,255,0.75);
+            transform: scale(1.15);
+        }
+
+        /* ══════════════════════════════════════════════
+           CELULAR EN ESCRITORIO
+        ══════════════════════════════════════════════ */
+        #l-celular {
+            position: absolute;
+            z-index: 4;
+            left: 1270px; top: 530px;
+            width: 60px; height: auto;
+        }
+        #hs-celular {
+            left: 1265px; top: 522px;
+            width: 70px; height: 120px;
+        }
+        /* Locked state: filter gris hasta que se desbloquea */
+        #l-celular.locked {
+            filter: brightness(0.6) saturate(0.4);
+            transition: filter 1.2s ease;
+        }
+        #l-celular.unlocked {
+            filter: brightness(1) saturate(1);
+            transition: filter 1.2s ease;
+            animation: phoneGlow 3s ease-in-out infinite;
+        }
+        @keyframes phoneGlow {
+            0%, 100% { filter: brightness(1) drop-shadow(0 0 0px rgba(155,200,255,0)); }
+            50%       { filter: brightness(1.15) drop-shadow(0 0 12px rgba(155,200,255,0.25)); }
+        }
+
+        /* ══════════════════════════════════════════════
+           CELULAR OVERLAY — PANTALLA EN PRIMER PLANO
+        ══════════════════════════════════════════════ */
+        #celular-overlay {
+            position: fixed; inset: 0;
+            background: rgba(6, 1, 18, 0.55);
+            backdrop-filter: blur(14px) brightness(0.65);
+            -webkit-backdrop-filter: blur(14px) brightness(0.65);
+            z-index: 800;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            opacity: 0;
+            transition: opacity 0.45s ease;
+        }
+        #celular-overlay.open    { display: flex; }
+        #celular-overlay.visible { opacity: 1; }
+
+        #phone-frame {
+            width: 210px; height: 420px;
+            background: #080810;
+            border-radius: 36px;
+            border: 1.5px solid rgba(255,255,255,0.12);
+            box-shadow:
+                0 24px 60px rgba(0,0,0,0.85),
+                0 0 0 1px rgba(255,255,255,0.06),
+                inset 0 1px 0 rgba(255,255,255,0.10);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            position: relative;
+            transform: scale(0.85) translateY(18px);
+            opacity: 0;
+            transition: transform 0.5s cubic-bezier(0.34, 1.36, 0.64, 1), opacity 0.4s ease;
+        }
+        #celular-overlay.visible #phone-frame {
+            transform: scale(1) translateY(0px);
+            opacity: 1;
+        }
+
+        /* Notch / Dynamic Island */
+        #phone-notch {
+            position: absolute;
+            top: 9px; left: 50%;
+            transform: translateX(-50%);
+            width: 72px; height: 20px;
+            background: #080810;
+            border-radius: 14px;
+            z-index: 5;
+        }
+
+        /* Status bar */
+        #phone-status {
+            padding: 13px 16px 6px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-family: -apple-system, 'SF Pro', sans-serif;
+            font-size: 11px;
+            color: rgba(255,255,255,0.7);
+            flex-shrink: 0;
+        }
+        #phone-time { font-weight: 600; letter-spacing: 0.02em; }
+        #phone-icons-status { display: flex; gap: 5px; align-items: center; }
+        .status-dot {
+            width: 5px; height: 5px;
+            border-radius: 50%;
+            background: rgba(255,255,255,0.5);
+        }
+
+        /* ── Messaging app ── */
+        #phone-screen {
+            flex: 1;
+            overflow: hidden;
+            position: relative;
+            background: #0b0016;
+        }
+
+        #msg-app {
+            position: absolute;
+            inset: 0;
+            display: flex;
+            flex-direction: column;
+            background: #0b0016;
+        }
+
+        .msg-view {
+            position: absolute;
+            inset: 0;
+            display: flex;
+            flex-direction: column;
+            transition: opacity 0.20s ease;
+        }
+        .msg-view.hidden { opacity: 0; pointer-events: none; }
+
+        .msg-hdr {
+            display: flex;
+            align-items: center;
+            padding: 8px 10px;
+            border-bottom: 1px solid rgba(255,255,255,0.06);
+            background: #130020;
+            flex-shrink: 0;
+            min-height: 34px;
+        }
+
+        /* Lista de chats */
+        .msg-list { flex: 1; overflow-y: auto; scrollbar-width: none; }
+        .msg-list::-webkit-scrollbar { display: none; }
+
+        .msg-item {
+            display: flex;
+            align-items: center;
+            padding: 9px 10px;
+            border-bottom: 1px solid rgba(255,255,255,0.04);
+            cursor: pointer;
+            gap: 9px;
+            transition: background 0.12s ease;
+        }
+        .msg-item:active { background: rgba(255,255,255,0.04); }
+
+        .msg-av {
+            width: 36px; height: 36px;
+            border-radius: 50%;
+            flex-shrink: 0;
+            overflow: hidden;
+            display: flex; align-items: center; justify-content: center;
+        }
+        .msg-av svg { width: 100%; height: 100%; }
+
+        .msg-item-info { flex: 1; min-width: 0; }
+        .msg-item-top  { display: flex; justify-content: space-between; align-items: baseline; }
+
+        .msg-item-name {
+            font-family: Georgia, serif;
+            font-size: 9.5px;
+            color: rgba(255,242,228,0.88);
+            letter-spacing: 0.02em;
+        }
+        .msg-item-time {
+            font-family: -apple-system, sans-serif;
+            font-size: 7.5px;
+            color: rgba(175,135,255,0.55);
+            flex-shrink: 0;
+            margin-left: 4px;
+        }
+        .msg-item-preview {
+            font-family: -apple-system, sans-serif;
+            font-size: 8.5px;
+            color: rgba(255,242,228,0.35);
+            margin-top: 2px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            letter-spacing: 0.01em;
+        }
+
+        /* Vista de chat */
+        .msg-chat-hdr {
+            display: flex;
+            align-items: center;
+            gap: 7px;
+            padding: 7px 10px;
+            border-bottom: 1px solid rgba(255,255,255,0.06);
+            background: #130020;
+            flex-shrink: 0;
+            min-height: 34px;
+        }
+        .msg-back {
+            font-size: 16px;
+            color: rgba(175,135,255,0.75);
+            cursor: pointer;
+            padding: 1px 5px 1px 0;
+            user-select: none;
+            line-height: 1;
+            font-family: Georgia, serif;
+        }
+        .msg-back:hover { color: rgba(175,135,255,1); }
+        .msg-chat-name {
+            font-family: Georgia, serif;
+            font-size: 9.5px;
+            color: rgba(255,242,228,0.88);
+            letter-spacing: 0.04em;
+        }
+        .msg-av-sm {
+            width: 24px; height: 24px;
+            border-radius: 50%;
+            flex-shrink: 0;
+            overflow: hidden;
+        }
+        .msg-av-sm svg { width: 100%; height: 100%; }
+
+        /* Burbujas */
+        .msg-bubbles {
+            flex: 1;
+            overflow-y: auto;
+            padding: 10px 9px 8px;
+            display: flex;
+            flex-direction: column;
+            gap: 3px;
+            scrollbar-width: none;
+        }
+        .msg-bubbles::-webkit-scrollbar { display: none; }
+
+        .msg-row { display: flex; }
+        .msg-row.me   { justify-content: flex-end;  }
+        .msg-row.them { justify-content: flex-start; }
+
+        .msg-bubble {
+            max-width: 76%;
+            padding: 5px 8px 4px;
+            border-radius: 11px;
+            position: relative;
+        }
+        .msg-bubble.me {
+            background: #2e1258;
+            border-bottom-right-radius: 3px;
+        }
+        .msg-bubble.them {
+            background: #18082e;
+            border-bottom-left-radius: 3px;
+            border: 1px solid rgba(255,255,255,0.06);
+        }
+        .msg-btext {
+            font-family: -apple-system, sans-serif;
+            font-size: 9px;
+            line-height: 1.48;
+            color: rgba(255,242,228,0.88);
+            letter-spacing: 0.01em;
+            display: block;
+        }
+        .msg-bubble.them .msg-btext { color: rgba(255,242,228,0.72); }
+        .msg-btime {
+            font-family: -apple-system, sans-serif;
+            font-size: 6.5px;
+            color: rgba(175,135,255,0.42);
+            display: block;
+            margin-top: 2px;
+            text-align: right;
+        }
+        .msg-row.them .msg-btime { text-align: left; }
+
+        /* Home indicator */
+        #phone-home {
+            height: 22px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: linear-gradient(160deg, #0e0124, #0a0118);
+            flex-shrink: 0;
+        }
+        #phone-home::after {
+            content: '';
+            width: 80px; height: 3px;
+            background: rgba(255,255,255,0.25);
+            border-radius: 2px;
+        }
+
+        /* Close celular */
+        #celular-close {
+            position: fixed;
+            top: 22px; right: 28px;
+            z-index: 820;
+            background: none; border: none; outline: none;
+            color: rgba(255,255,255,0.28);
+            font-size: 22px;
+            cursor: pointer;
+            line-height: 1; padding: 10px;
+            transition: color 0.2s ease, transform 0.2s ease;
+        }
+        #celular-close:hover {
+            color: rgba(255,255,255,0.75);
+            transform: scale(1.15);
+        }
+
+        /* ══════════════════════════════════════════════
+           PANTALLA INICIO DEL CELULAR
+        ══════════════════════════════════════════════ */
+        #phone-home-screen {
+            position: absolute;
+            inset: 0;
+            background: linear-gradient(160deg, #0b0020 0%, #0d001a 100%);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding-top: 18px;
+            gap: 0;
+        }
+        .phone-app-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 12px;
+            padding: 10px 14px;
+            width: 100%;
+        }
+        .phone-app-icon {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 4px;
+            cursor: pointer;
+            user-select: none;
+        }
+        .phone-app-icon-img {
+            width: 40px; height: 40px;
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 20px;
+            transition: transform 0.15s ease, filter 0.15s ease;
+        }
+        .phone-app-icon:active .phone-app-icon-img {
+            transform: scale(0.88);
+            filter: brightness(0.85);
+        }
+        .phone-app-icon-label {
+            font-family: -apple-system, sans-serif;
+            font-size: 7px;
+            color: rgba(255,255,255,0.55);
+            letter-spacing: 0.04em;
+            text-align: center;
+        }
+
+        /* ══════════════════════════════════════════════
+           GALERÍA APP
+        ══════════════════════════════════════════════ */
+        #gallery-app {
+            position: absolute;
+            inset: 0;
+            background: #080810;
+            display: flex;
+            flex-direction: column;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.2s ease;
+        }
+        #gallery-app.open {
+            opacity: 1;
+            pointer-events: auto;
+        }
+        #gallery-hdr {
+            display: flex;
+            align-items: center;
+            padding: 7px 10px;
+            border-bottom: 1px solid rgba(255,255,255,0.06);
+            background: #0e0020;
+            flex-shrink: 0;
+            min-height: 32px;
+            gap: 7px;
+        }
+        #gallery-back {
+            font-size: 16px;
+            color: rgba(175,135,255,0.75);
+            cursor: pointer;
+            padding: 1px 5px 1px 0;
+            user-select: none;
+            line-height: 1;
+            font-family: Georgia, serif;
+        }
+        #gallery-back:hover { color: rgba(175,135,255,1); }
+        #gallery-title {
+            font-family: Georgia, serif;
+            font-size: 9px;
+            color: rgba(255,242,228,0.75);
+            letter-spacing: 0.12em;
+            flex: 1;
+        }
+        #gallery-grid-wrap {
+            flex: 1;
+            overflow-y: auto;
+            scrollbar-width: none;
+            padding: 4px;
+        }
+        #gallery-grid-wrap::-webkit-scrollbar { display: none; }
+        .gallery-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 2px;
+        }
+        .gallery-thumb {
+            position: relative;
+            aspect-ratio: 1;
+            overflow: hidden;
+            cursor: pointer;
+            background: #111;
+        }
+        .gallery-thumb img {
+            width: 100%; height: 100%;
+            object-fit: cover;
+            display: block;
+            transition: transform 0.2s ease;
+        }
+        .gallery-thumb:active img { transform: scale(0.93); }
+        .gallery-thumb .vid-badge {
+            position: absolute;
+            bottom: 3px; right: 3px;
+            background: rgba(0,0,0,0.55);
+            border-radius: 3px;
+            padding: 1px 3px;
+            font-size: 6px;
+            color: rgba(255,255,255,0.80);
+            display: flex;
+            align-items: center;
+            gap: 1px;
+            pointer-events: none;
+        }
+
+        /* ── Viewer de foto/video ── */
+        #gallery-viewer {
+            position: absolute;
+            inset: 0;
+            background: #000;
+            display: flex;
+            flex-direction: column;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.22s ease;
+            z-index: 10;
+        }
+        #gallery-viewer.open {
+            opacity: 1;
+            pointer-events: auto;
+        }
+        #viewer-hdr {
+            display: flex;
+            align-items: center;
+            padding: 6px 8px;
+            background: rgba(0,0,0,0.75);
+            flex-shrink: 0;
+            min-height: 28px;
+            gap: 6px;
+            position: absolute;
+            top: 0; left: 0; right: 0;
+            z-index: 2;
+        }
+        #viewer-back {
+            font-size: 16px;
+            color: rgba(255,255,255,0.75);
+            cursor: pointer;
+            user-select: none;
+            font-family: Georgia, serif;
+            padding-right: 4px;
+        }
+        #viewer-counter {
+            font-family: -apple-system, sans-serif;
+            font-size: 7.5px;
+            color: rgba(255,255,255,0.45);
+            flex: 1;
+            text-align: center;
+            letter-spacing: 0.08em;
+        }
+        #viewer-media {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+            position: relative;
+        }
+        #viewer-img {
+            max-width: 100%; max-height: 100%;
+            object-fit: contain;
+            display: block;
+            user-select: none;
+            -webkit-user-drag: none;
+        }
+        #viewer-vid {
+            max-width: 100%; max-height: 100%;
+            object-fit: contain;
+            display: none;
+        }
+        .viewer-arrow {
+            position: absolute;
+            top: 50%; transform: translateY(-50%);
+            background: rgba(0,0,0,0.35);
+            border: none; outline: none;
+            color: rgba(255,255,255,0.60);
+            font-size: 18px;
+            cursor: pointer;
+            padding: 10px 5px;
+            z-index: 3;
+            border-radius: 3px;
+            transition: background 0.15s ease;
+        }
+        .viewer-arrow:hover { background: rgba(0,0,0,0.6); color: #fff; }
+        #viewer-prev { left: 2px; }
+        #viewer-next { right: 2px; }
+
+        /* ══════════════════════════════════════════════
+           FONDO EXTENSO — evita barras negras en zooms
+        ══════════════════════════════════════════════ */
+        /* Hace el stage impenetrable para mostrar solo contenido del zoomer */
+        #s2-stage { overflow: hidden; }
+
+        /* Gran rect con el color de la pared derecha — z-index 0,
+           se extiende mucho más allá del stage para cubrir cualquier borde
+           visible durante zoom in, sin importar resolución o dirección. */
+        #s2-wall-fill {
+            position: absolute;
+            left: -5000px; top: -5000px;
+            width: 12000px; height: 12000px;
+            background: #27114e; /* rincón derecho de la habitación */
+            z-index: 0;
+            pointer-events: none;
+        }
+
+        /* ══════════════════════════════════════════════
+           BIBLIOTECA Y LIBROS — glow interactivo unificado (s4)
+        ══════════════════════════════════════════════ */
+        #l-biblioteca.b-breathing       { animation: unifiedBreathe    3.2s ease-in-out infinite; cursor: pointer !important; pointer-events: auto !important; }
+        #l-biblioteca.b-breathing.b-hvr { animation: unifiedBreatheHvr 2.0s ease-in-out infinite; cursor: pointer !important; }
+        #l-biblioteca.b-stop {
+            animation: none;
+            filter: brightness(0.82) saturate(0.90);
+            transition: filter 1.4s ease;
+        }
+        #l-libros.b-breathing           { animation: unifiedBreathe    3.2s ease-in-out infinite; cursor: pointer !important; pointer-events: auto !important; }
+        #l-libros.b-breathing.b-hvr     { animation: unifiedBreatheHvr 2.0s ease-in-out infinite; cursor: pointer !important; }
+        #l-libros.b-stop { animation: none; filter: brightness(0.78) saturate(0.85); }
+
+        /* Hotspot — cubre toda la biblioteca */
+        #hs-biblioteca {
+            right: -80px; top: 170px;
+            width: 640px; height: 510px;
+        }
+
+        /* Hotspot — zona de libros interactivos (activo en zoom) */
+        #hs-book-1 {
+            right: 28px; top: 260px;
+            width: 315px; height: 380px;
+        }
+
+        /* ══════════════════════════════════════════════
+           LIBRO OVERLAY
+        ══════════════════════════════════════════════ */
+        #libro-overlay {
+            position: fixed; inset: 0;
+            z-index: 700;
+            pointer-events: none;
+            opacity: 0;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            transition: opacity 1.0s ease;
+        }
+        #libro-overlay.lb-open {
+            display: flex;
+        }
+
+        #libro-backdrop {
+            position: absolute; inset: 0;
+            background: rgba(8, 2, 20, 0.48);
+            backdrop-filter: blur(14px) brightness(0.55);
+            -webkit-backdrop-filter: blur(14px) brightness(0.55);
+        }
+
+        /* ══════════════════════════════════════════════
+           LIBRO 3D PHYSICAL ANIMATIONS
+        ══════════════════════════════════════════════ */
+        #libro-stage {
+            position: relative;
+            z-index: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            perspective: 2000px;
+            transform-style: preserve-3d;
+            width: 100vw; height: 100vh;
+        }
+
+        .lb-3d-wrap {
+            position: absolute;
+            top: 50%; left: 50%;
+            transform: translate(-50%, -50%);
+            display: none;
+            user-select: none;
+            -webkit-user-drag: none;
+            transform-style: preserve-3d;
+            will-change: transform, opacity;
+        }
+        .lb-3d-wrap.lb-shown { display: block; }
+
+        /* Pivotes físicos desde el lomo del libro */
+        #wrap-tapa {
+            transform-origin: left center;
+        }
+
+        #wrap-abierto {
+            transform-origin: center center;
+        }
+
+        #wrap-trasera {
+            transform-origin: right center;
+        }
+
+        /* Tapa delantera */
+        #libro-tapa {
+            height: 74vh; width: auto;
+            max-width: 88vw;
+            display: block;
+            user-select: none;
+            -webkit-user-drag: none;
+        }
+
+        /* Libro abierto */
+        #libro-abierto-wrap {
+            position: relative;
+            line-height: 0;
+        }
+        #libro-abierto {
+            max-width: 88vw;
+            max-height: 74vh;
+            width: auto; height: auto;
+            display: block;
+            user-select: none;
+            -webkit-user-drag: none;
+        }
+
+        /* Tapa trasera */
+        #libro-trasera {
+            height: 74vh; width: auto;
+            max-width: 88vw;
+            display: block;
+            user-select: none;
+            -webkit-user-drag: none;
+        }
+
+        /* Animaciones 3D físicas de rotación continua desde el lomo */
+        @keyframes lbPhysicalOpenFront {
+            0%   { transform: translate(-50%, -50%) rotateY(0deg); opacity: 1; }
+            100% { transform: translate(-50%, -50%) rotateY(-90deg); opacity: 0.12; }
+        }
+        @keyframes lbPhysicalUnfoldOpen {
+            0%   { transform: translate(-50%, -50%) rotateY(90deg); opacity: 0.12; }
+            100% { transform: translate(-50%, -50%) rotateY(0deg); opacity: 1; }
+        }
+        @keyframes lbPhysicalFoldOpen {
+            0%   { transform: translate(-50%, -50%) rotateY(0deg); opacity: 1; }
+            100% { transform: translate(-50%, -50%) rotateY(-90deg); opacity: 0.12; }
+        }
+        @keyframes lbPhysicalCloseBack {
+            0%   { transform: translate(-50%, -50%) rotateY(90deg); opacity: 0.12; }
+            100% { transform: translate(-50%, -50%) rotateY(0deg); opacity: 1; }
+        }
+
+        /* Wash tenue sobre la página izquierda — deshabilitado para evitar recuadros claros */
+        #libro-page-wash {
+            display: none !important;
+        }
+
+        /* Contenedor clickeable de la Sticky Note sobre la página izquierda */
+        #libro-sticky-wrapper {
+            position: absolute;
+            left: 7.5%; top: 11%;
+            width: 32.5%; height: auto;
+            aspect-ratio: 1 / 1;
+            pointer-events: auto;
+            z-index: 2;
+            filter: drop-shadow(4px 10px 20px rgba(0, 0, 0, 0.40));
+            opacity: 0;
+            transform: rotate(-2.8deg) scale(0.95);
+            transition: opacity 1.0s ease, transform 0.35s cubic-bezier(0.22, 1, 0.36, 1), filter 0.35s ease;
+            cursor: pointer;
+            text-decoration: none;
+            display: block;
+        }
+        #libro-sticky-wrapper.lb-shown {
+            opacity: 1;
+            transform: rotate(-2.8deg) scale(1);
+        }
+        #libro-sticky-wrapper:hover {
+            transform: rotate(-2.8deg) scale(1.05);
+            filter: drop-shadow(6px 14px 28px rgba(0, 0, 0, 0.60));
+        }
+
+        /* Imagen del stick note — mix-blend-mode multiply elimina cualquier fondo blanco */
+        #libro-hoja-papel {
+            width: 100%; height: 100%;
+            object-fit: contain;
+            display: block;
+            mix-blend-mode: multiply;
+            pointer-events: none;
+        }
+
+        .sn-footer {
+            font-size: clamp(4.6px, 0.44vw, 6.6px);
+            font-weight: 600;
+            color: rgba(30, 20, 0, 0.65);
+            text-align: right;
+            margin-top: 2px;
+        }
+
+        .sn-tag, .sn-text, .sn-subtext, .sn-btn, .sn-footer {
+            opacity: 0;
+            transform: translateY(6px);
+            transition: opacity 0.7s ease, transform 0.7s cubic-bezier(0.22, 1, 0.36, 1);
+        }
+        #libro-info.lb-shown .sn-tag     { opacity: 1; transform: translateY(0); transition-delay: 0.15s; }
+        #libro-info.lb-shown .sn-text    { opacity: 1; transform: translateY(0); transition-delay: 0.35s; }
+        #libro-info.lb-shown .sn-subtext { opacity: 1; transform: translateY(0); transition-delay: 0.50s; }
+        #libro-info.lb-shown .sn-btn     { opacity: 1; transform: translateY(0); transition-delay: 0.65s; }
+        #libro-info.lb-shown .sn-footer  { opacity: 1; transform: translateY(0); transition-delay: 0.85s; }
+        .li-header {
+            font-size: clamp(7px, 0.88vw, 12px);
+            font-weight: bold;
+            font-style: normal;
+            letter-spacing: 0.04em;
+            line-height: 1.35;
+            color: #150902;
+            border-bottom: 0.5px solid rgba(50,26,8,0.22);
+            padding-bottom: 0.5em;
+            margin: 0 0 0.5em;
+        }
+        .li-divider {
+            width: 22px; height: 0.5px;
+            background: rgba(50,26,8,0.28);
+            margin: 0.2em 0 0.65em;
+        }
+        .li-stat {
+            font-size: clamp(7.5px, 0.92vw, 12.5px);
+            line-height: 1.65;
+            font-style: italic;
+            margin: 0 0 0.70em;
+            color: #1a0f06;
+        }
+        .li-stat strong {
+            font-style: normal;
+            font-size: clamp(8.5px, 1.10vw, 14.5px);
+            font-weight: bold;
+            color: #0f0603;
+        }
+        .li-sub {
+            font-size: clamp(7px, 0.78vw, 10.5px);
+            line-height: 1.60;
+            color: rgba(26, 15, 6, 0.76);
+            margin: 0 0 0.95em;
+        }
+        .li-source {
+            font-size: clamp(5px, 0.60vw, 8px);
+            line-height: 1.55;
+            color: rgba(26, 15, 6, 0.48);
+            font-style: italic;
+            border-top: 0.5px solid rgba(50,26,8,0.16);
+            padding-top: 0.45em;
+            margin: 0;
+        }
+
+        /* ── Hint de libro ── */
+        #libro-hint {
+            position: fixed;
+            bottom: 36px; left: 50%;
+            transform: translateX(-50%);
+            z-index: 710;
+            font-family: 'Georgia', serif;
+            font-style: italic;
+            font-size: 12px;
+            letter-spacing: 0.26em;
+            color: rgba(255,255,255,0.22);
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 2s ease;
+            user-select: none;
+            white-space: nowrap;
+        }
+        #libro-hint.lb-shown { opacity: 1; }
+
+        /* ── Botón cerrar libro ── */
+        #libro-close {
+            position: fixed;
+            top: 22px; right: 28px;
+            z-index: 720;
+            background: none; border: none; outline: none;
+            color: rgba(255,255,255,0.28);
+            font-size: 22px; cursor: pointer;
+            line-height: 1; padding: 10px;
+            transition: color 0.2s ease, transform 0.2s ease;
+            display: none;
+        }
+        #libro-close.lb-shown { display: block; }
+        /* ── Botón para continuar a la Escena 3 ── */
+        #btn-to-escena3 {
+            position: fixed;
+            bottom: 32px;
+            right: 36px;
+            z-index: 800;
+            background: rgba(30, 12, 58, 0.82);
+            border: 1.5px solid rgba(224, 195, 252, 0.45);
+            color: #ffffff;
+            padding: 12px 24px;
+            border-radius: 30px;
+            font-family: 'Courier Prime', Georgia, serif;
+            font-size: 13px;
+            font-weight: bold;
+            letter-spacing: 0.16em;
+            text-transform: uppercase;
+            text-decoration: none;
+            backdrop-filter: blur(14px);
+            -webkit-backdrop-filter: blur(14px);
+            box-shadow: 0 0 25px rgba(138, 64, 229, 0.45), 0 8px 24px rgba(0, 0, 0, 0.4);
+            opacity: 0;
+            pointer-events: none;
+            transform: translateY(14px);
+            transition: opacity 1.0s ease, transform 1.0s cubic-bezier(0.16, 1, 0.3, 1), background 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease;
+        }
+        #btn-to-escena3.visible {
+            opacity: 1;
+            pointer-events: auto;
+            transform: translateY(0);
+        }
+        /* ════════════════════════════════════════
+           BOTÓN DE AUDIO / MÚSICA DE FONDO
+        ════════════════════════════════════════ */
+        #audio-toggle-btn {
+            position: fixed;
+            top: 24px;
+            right: 24px;
+            z-index: 9999;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 10px 18px;
+            border-radius: 40px;
+            background: rgba(20, 10, 35, 0.55);
+            border: 1px solid rgba(255, 255, 255, 0.25);
+            color: rgba(255, 255, 255, 0.9);
+            font-family: 'Inter', sans-serif;
+            font-size: 13px;
+            font-weight: 600;
+            letter-spacing: 0.5px;
+            cursor: pointer;
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.35), 0 0 15px rgba(138, 64, 229, 0.2);
+            transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+            user-select: none;
+            outline: none;
+        }
+        #audio-toggle-btn:hover {
+            background: rgba(138, 64, 229, 0.50);
+            border-color: rgba(255, 255, 255, 0.7);
+            color: #ffffff;
+            transform: translateY(-2px) scale(1.03);
+            box-shadow: 0 6px 25px rgba(0, 0, 0, 0.45), 0 0 25px rgba(138, 64, 229, 0.5);
+        }
+        #audio-toggle-btn:active {
+            transform: translateY(0) scale(0.98);
+        }
+        #audio-toggle-btn svg {
+            width: 16px;
+            height: 16px;
+            fill: currentColor;
+            flex-shrink: 0;
+            transition: transform 0.2s ease;
+        }
+        #audio-toggle-btn.playing svg {
+            filter: drop-shadow(0 0 4px rgba(255, 255, 255, 0.6));
+        }
+
+    </style>
+</head>
+<body>
+
+<div id="s2">
+    <div id="cinematic-vignette"></div>
+    <div id="s2-stage">
+        <div id="s2-zoomer">
+            <div id="s2-wall-fill"></div>
+
+            <!-- Fondo: habitación sin muebles -->
+            <img class="layer" id="l-fondo"    src="habitacion sin muebles.png" alt="">
+
+            <!-- Cama (sin almohada, con funda) -->
+            <img class="layer" id="l-cama"     src="cama.png" alt="">
+
+            <!-- Remedio — z:3, SIEMPRE debajo de la almohada (z:4).
+                 Oculto al inicio. Aparece cuando la almohada desaparece. -->
+            <img class="layer" id="l-remedio"  src="Remedio.png" alt="">
+
+            <!-- Almohada — z:4, encima de la cama y del remedio -->
+            <img class="layer" id="l-almohada" src="Almohada.png" alt="">
+
+            <!-- Hotspots cama -->
+            <div class="hotspot cur-hand" id="hs-cama"></div>
+            <div class="hotspot cur-hand" id="hs-almohada"></div>
+            <div class="hotspot cur-hand" id="hs-remedio"></div>
+
+            <!-- ── Escena 3: Escritorio, ráyo, cuaderno, lámpara ── -->
+            <img class="layer" id="l-escritorio" src="escritorio.png" alt="">
+
+
+            <img class="layer" id="l-cuaderno"   src="cuaderno en blanco.png"   alt="">
+            <img class="layer" id="l-lampara"    src="lampara.png"    alt="">
+
+            <!-- Biblioteca en la pared derecha -->
+            <img class="layer" id="l-biblioteca" src="biblioteca.png" alt="">
+            <!-- Libros sobre el estante del medio -->
+            <img class="layer" id="l-libros"     src="libros.png"     alt="">
+
+            <!-- Hotspot escritorio -->
+            <div class="hotspot cur-hand" id="hs-escritorio"></div>
+            <!-- Hotspot cuaderno (activo al hacer zoom al escritorio) -->
+            <div class="hotspot" id="hs-cuaderno"></div>
+            <!-- Hotspot lámpara (activo al hacer zoom al escritorio) -->
+            <div class="hotspot" id="hs-lampara"></div>
+
+            <!-- Celular en el escritorio -->
+            <img class="layer locked" id="l-celular" src="celular.png" alt="">
+            <!-- Hotspot celular (bloqueado hasta interactuar con cuaderno) -->
+            <div class="hotspot" id="hs-celular"></div>
+
+            <!-- Hotspot biblioteca (activo tras interactuar con escritorio) -->
+            <div class="hotspot" id="hs-biblioteca"></div>
+            <!-- Hotspot libro individual (activo en zoom de biblioteca) -->
+            <div class="hotspot" id="hs-book-1"></div>
+
+        </div>
+    </div>
+</div>
+
+<!-- Remedio spotlight overlay (intimate lighting accent) -->
+<div id="remedio-spotlight"></div>
+
+<!-- Remedio foreground (zoom hacia cámara) -->
+<div id="remedio-fg"><img src="Remedio.png" alt=""></div>
+
+<!-- GIF final — fondo transparente -->
+<div id="remedio-gif">
+    <img src="remedio gif.gif" alt="">
+</div>
+
+
+<!-- Hint sutil de retorno -->
+<div id="return-hint">— tocá para volver —</div>
+
+<!-- Botón para continuar -->
+<a id="btn-to-escena3" href="escena3.html">SIGUIENTE →</a>
+
+<!-- Fade de entrada -->
+<div id="intro-fade"></div>
+
+<!-- Botón de Control de Audio -->
+<button id="audio-toggle-btn" aria-label="Control de Sonido" title="Activar / Pausar Música">
+    <svg id="audio-icon-play" viewBox="0 0 24 24" style="display:none;">
+        <path d="M8 5v14l11-7z"/>
+    </svg>
+    <svg id="audio-icon-pause" viewBox="0 0 24 24">
+        <path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/>
+    </svg>
+    <span id="audio-btn-text">Música</span>
+</button>
+
+<!-- ════════════════════════════════════════
+     CELULAR OVERLAY
+════════════════════════════════════════ -->
+<div id="celular-overlay">
+    <div id="phone-frame">
+        <div id="phone-notch"></div>
+        <div id="phone-status">
+            <span id="phone-time">9:41</span>
+            <div id="phone-icons-status">
+                <div class="status-dot"></div>
+                <div class="status-dot"></div>
+                <div class="status-dot"></div>
+            </div>
+        </div>
+        <div id="phone-screen">
+            <!-- Messaging app se monta via JS -->
+        </div>
+        <div id="phone-home"></div>
+    </div>
+    <button id="celular-close">✕</button>
+</div>
+
+<!-- ════════════════════════════════════════
+     CUADERNO VIEWER
+════════════════════════════════════════ -->
+<div id="cuaderno-overlay">
+    <div id="cuaderno-wrap">
+        <!-- Base: página siguiente/anterior (debajo) -->
+        <img class="c-layer" id="c-base" alt="">
+        <!-- Página actual (encima) -->
+        <img class="c-layer" id="c-current" alt="">
+        <!-- Elemento de flip — JS controla posición, bg y animación -->
+        <div id="c-flip"></div>
+        <!-- Zonas de click -->
+        <div id="c-zone-left"></div>
+        <div id="c-zone-right"></div>
+        <!-- Indicadores de flecha -->
+        <div id="c-arrow-l">‹</div>
+        <div id="c-arrow-r">›</div>
+        <!-- Contador de páginas -->
+        <div id="c-counter">1 / 4</div>
+    </div>
+    <button id="c-close">✕</button>
+</div>
+
+<script>
+/* ═══════════════════════════════════════════════════════════════
+   DIEGETIC SOUND DESIGN LAYER — BEDROOM SCENE
+   Subtle, intimate, nocturnal, realistic, fragile audio engine
+═══════════════════════════════════════════════════════════════ */
+var BedroomAudio = (function() {
+    'use strict';
+    
+    var ctx = null;
+    var masterGain = null;
+    var ambienceNode = null;
+    var ambienceFilter = null;
+    var humOsc = null;
+    var humGain = null;
+    var bgMusic = null;
+    var bgMusicStarted = false;
+    var musicFadingIn = false;
+    var musicFadingOut = false;
+    var unlocked = false;
+
+    function initCtx() {
+        if (ctx) return;
+        var AudioCtx = window.AudioContext || window.webkitAudioContext;
+        if (!AudioCtx) return;
+        ctx = new AudioCtx();
+        
+        masterGain = ctx.createGain();
+        masterGain.gain.setValueAtTime(0.85, ctx.currentTime);
+        masterGain.connect(ctx.destination);
+    }
+
+    function initBgMusic() {
+        if (!bgMusic) {
+            bgMusic = new Audio('este.flac');
+            bgMusic.preload = 'auto';
+            bgMusic.autoplay = true;
+            bgMusic.loop = false;
+            bgMusic.currentTime = 0;
+        }
+    }
+
+    function updateAudioBtnUI(isPlaying) {
+        var btn = document.getElementById('audio-toggle-btn');
+        var iconPlay = document.getElementById('audio-icon-play');
+        var iconPause = document.getElementById('audio-icon-pause');
+        var btnText = document.getElementById('audio-btn-text');
+        
+        if (!btn) return;
+        if (isPlaying) {
+            if (iconPlay) iconPlay.style.display = 'none';
+            if (iconPause) iconPause.style.display = 'inline-block';
+            if (btnText) btnText.textContent = 'Música';
+            btn.classList.add('playing');
+            btn.setAttribute('title', 'Pausar Música');
+        } else {
+            if (iconPlay) iconPlay.style.display = 'inline-block';
+            if (iconPause) iconPause.style.display = 'none';
+            if (btnText) btnText.textContent = 'Música';
+            btn.classList.remove('playing');
+            btn.setAttribute('title', 'Reproducir Música');
+        }
+    }
+
+    function toggleBgMusic() {
+        initBgMusic();
+        if (!bgMusic) return false;
+        
+        if (bgMusic.paused) {
+            musicFadingOut = false;
+            var playPromise = bgMusic.play();
+            if (playPromise !== undefined) {
+                playPromise.then(function() {
+                    bgMusicStarted = true;
+                    bgMusic.volume = 0.55;
+                    updateAudioBtnUI(true);
+                }).catch(function(err){});
+            }
+            return true;
+        } else {
+            bgMusic.pause();
+            musicFadingIn = false;
+            updateAudioBtnUI(false);
+            return false;
+        }
+    }
+
+    function startBgMusic() {
+        initBgMusic();
+        if (bgMusicStarted || musicFadingOut) return;
+
+        if (bgMusic && (bgMusic.paused || bgMusic.currentTime === 0) && !musicFadingIn) {
+            musicFadingIn = true;
+            bgMusic.volume = 0;
+            var targetVol = 0.55;
+            var fadeInDur = 3000;
+            var t0 = null;
+
+            var playPromise = bgMusic.play();
+            if (playPromise !== undefined) {
+                playPromise.then(function() {
+                    bgMusicStarted = true;
+                    updateAudioBtnUI(true);
+                    function step(ts) {
+                        if (!t0) t0 = ts;
+                        var p = Math.min((ts - t0) / fadeInDur, 1);
+                        if (bgMusic) bgMusic.volume = p * targetVol;
+                        if (p < 1 && !musicFadingOut) {
+                            requestAnimationFrame(step);
+                        } else {
+                            musicFadingIn = false;
+                        }
+                    }
+                    requestAnimationFrame(step);
+                }).catch(function(err) {
+                    musicFadingIn = false;
+                    updateAudioBtnUI(false);
+                });
+            }
+        }
+    }
+
+    function fadeOutBgMusic(durMs, callback) {
+        if (!bgMusic || bgMusic.paused) {
+            if (callback) callback();
+            return;
+        }
+        musicFadingOut = true;
+        var startVol = bgMusic.volume;
+        var fadeDur = durMs || 1200;
+        var t0 = null;
+
+        function step(ts) {
+            if (!t0) t0 = ts;
+            var p = Math.min((ts - t0) / fadeDur, 1);
+            if (bgMusic) bgMusic.volume = Math.max(0, startVol * (1 - p));
+            if (p < 1) {
+                requestAnimationFrame(step);
+            } else {
+                if (bgMusic) bgMusic.pause();
+                musicFadingOut = false;
+                updateAudioBtnUI(false);
+                if (callback) callback();
+            }
+        }
+        requestAnimationFrame(step);
+    }
+
+    function unlockAudio() {
+        initCtx();
+        startBgMusic();
+        if (ctx && ctx.state === 'suspended') {
+            ctx.resume().then(function() {
+                if (!unlocked) {
+                    unlocked = true;
+                    startRoomAmbience();
+                }
+            }).catch(function(){});
+        } else if (ctx && !unlocked) {
+            unlocked = true;
+            startRoomAmbience();
+        }
+    }
+
+    // 1. ROOM AMBIENCE: Subtle room tone (air, distant building ambience, soft electrical presence)
+    function startRoomAmbience() {
+        if (!ctx || ambienceNode) return;
+        var t = ctx.currentTime;
+
+        var bufferSize = ctx.sampleRate * 4;
+        var buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
+        var data = buffer.getChannelData(0);
+        var lastOut = 0.0;
+        for (var i = 0; i < bufferSize; i++) {
+            var white = Math.random() * 2 - 1;
+            data[i] = (lastOut + (0.02 * white)) / 1.02;
+            lastOut = data[i];
+        }
+
+        var noise = ctx.createBufferSource();
+        noise.buffer = buffer;
+        noise.loop = true;
+
+        ambienceFilter = ctx.createBiquadFilter();
+        ambienceFilter.type = 'lowpass';
+        ambienceFilter.frequency.setValueAtTime(220, t);
+        ambienceFilter.Q.setValueAtTime(1.0, t);
+
+        var ambGain = ctx.createGain();
+        ambGain.gain.setValueAtTime(0.018, t);
+
+        humOsc = ctx.createOscillator();
+        humGain = ctx.createGain();
+        humOsc.type = 'sine';
+        humOsc.frequency.setValueAtTime(50, t);
+        humGain.gain.setValueAtTime(0.003, t);
+
+        noise.connect(ambienceFilter);
+        ambienceFilter.connect(ambGain);
+        ambGain.connect(masterGain);
+
+        humOsc.connect(humGain);
+        humGain.connect(masterGain);
+
+        noise.start(t);
+        humOsc.start(t);
+
+        ambienceNode = noise;
+    }
+
+    // 2. BED: Soft mattress & fabric creak
+    function playBedSound() {
+        if (!ctx) return;
+        var t = ctx.currentTime;
+        
+        var bufSize = Math.floor(ctx.sampleRate * 0.45);
+        var buf = ctx.createBuffer(1, bufSize, ctx.sampleRate);
+        var d = buf.getChannelData(0);
+        for (var i = 0; i < bufSize; i++) {
+            d[i] = (Math.random() * 2 - 1) * Math.sin(Math.PI * i / bufSize);
+        }
+        var noise = ctx.createBufferSource();
+        noise.buffer = buf;
+        
+        var filter = ctx.createBiquadFilter();
+        filter.type = 'bandpass';
+        filter.frequency.setValueAtTime(450, t);
+        filter.Q.setValueAtTime(1.8, t);
+        
+        var g = ctx.createGain();
+        g.gain.setValueAtTime(0.025, t);
+        g.gain.exponentialRampToValueAtTime(0.001, t + 0.42);
+
+        noise.connect(filter);
+        filter.connect(g);
+        g.connect(masterGain);
+        noise.start(t);
+
+        var osc = ctx.createOscillator();
+        var og = ctx.createGain();
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(160, t + 0.05);
+        osc.frequency.exponentialRampToValueAtTime(120, t + 0.25);
+        
+        og.gain.setValueAtTime(0.015, t + 0.05);
+        og.gain.exponentialRampToValueAtTime(0.0005, t + 0.25);
+
+        osc.connect(og);
+        og.connect(masterGain);
+        osc.start(t + 0.05);
+        osc.stop(t + 0.26);
+    }
+
+    // 3. PILLOW: Delicate fabric movement & soft compression
+    function playPillowSound() {
+        if (!ctx) return;
+        var t = ctx.currentTime;
+
+        var bufSize = Math.floor(ctx.sampleRate * 0.5);
+        var buf = ctx.createBuffer(1, bufSize, ctx.sampleRate);
+        var d = buf.getChannelData(0);
+        for (var i = 0; i < bufSize; i++) {
+            var env = Math.sin(Math.PI * (i / bufSize));
+            d[i] = (Math.random() * 2 - 1) * env * env;
+        }
+        var noise = ctx.createBufferSource();
+        noise.buffer = buf;
+
+        var filter = ctx.createBiquadFilter();
+        filter.type = 'bandpass';
+        filter.frequency.setValueAtTime(950, t);
+        filter.frequency.exponentialRampToValueAtTime(650, t + 0.48);
+        filter.Q.setValueAtTime(1.4, t);
+
+        var g = ctx.createGain();
+        g.gain.setValueAtTime(0.028, t);
+        g.gain.exponentialRampToValueAtTime(0.001, t + 0.48);
+
+        noise.connect(filter);
+        filter.connect(g);
+        g.connect(masterGain);
+        noise.start(t);
+    }
+
+    // 4. MEDICATION: Subtle blister-pack plastic & tiny pill movement
+    function playMedicationSound() {
+        if (!ctx) return;
+        var t = ctx.currentTime;
+
+        var bufSize = Math.floor(ctx.sampleRate * 0.18);
+        var buf = ctx.createBuffer(1, bufSize, ctx.sampleRate);
+        var d = buf.getChannelData(0);
+        for (var i = 0; i < bufSize; i++) {
+            d[i] = (Math.random() * 2 - 1) * Math.exp(-i / (bufSize * 0.3));
+        }
+        var noise = ctx.createBufferSource();
+        noise.buffer = buf;
+
+        var filter = ctx.createBiquadFilter();
+        filter.type = 'bandpass';
+        filter.frequency.setValueAtTime(4200, t);
+        filter.Q.setValueAtTime(3.5, t);
+
+        var g = ctx.createGain();
+        g.gain.setValueAtTime(0.022, t);
+        g.gain.exponentialRampToValueAtTime(0.001, t + 0.18);
+
+        noise.connect(filter);
+        filter.connect(g);
+        g.connect(masterGain);
+        noise.start(t);
+
+        [0.04, 0.095].forEach(function(delay, idx) {
+            var osc = ctx.createOscillator();
+            var og = ctx.createGain();
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(1850 + idx * 240, t + delay);
+            og.gain.setValueAtTime(0.012, t + delay);
+            og.gain.exponentialRampToValueAtTime(0.0005, t + delay + 0.025);
+            osc.connect(og);
+            og.connect(masterGain);
+            osc.start(t + delay);
+            osc.stop(t + delay + 0.03);
+        });
+    }
+
+    // 5. LAMP: Physical switch click + subtle warm electrical hum
+    function playLampSound() {
+        if (!ctx) return;
+        var t = ctx.currentTime;
+
+        var osc = ctx.createOscillator();
+        var g = ctx.createGain();
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(680, t);
+        osc.frequency.exponentialRampToValueAtTime(220, t + 0.015);
+        g.gain.setValueAtTime(0.038, t);
+        g.gain.exponentialRampToValueAtTime(0.001, t + 0.018);
+        osc.connect(g);
+        g.connect(masterGain);
+        osc.start(t);
+        osc.stop(t + 0.02);
+
+        var hum = ctx.createOscillator();
+        var hg = ctx.createGain();
+        hum.type = 'sine';
+        hum.frequency.setValueAtTime(120, t + 0.015);
+        hg.gain.setValueAtTime(0.001, t + 0.015);
+        hg.gain.linearRampToValueAtTime(0.018, t + 0.15);
+        hg.gain.exponentialRampToValueAtTime(0.0005, t + 1.4);
+
+        hum.connect(hg);
+        hg.connect(masterGain);
+        hum.start(t + 0.015);
+        hum.stop(t + 1.45);
+    }
+
+    // 6. DESK: Subtle wooden/fabric movement sound when touching/approaching
+    function playDeskSound() {
+        if (!ctx) return;
+        var t = ctx.currentTime;
+
+        var bufSize = Math.floor(ctx.sampleRate * 0.3);
+        var buf = ctx.createBuffer(1, bufSize, ctx.sampleRate);
+        var d = buf.getChannelData(0);
+        for (var i = 0; i < bufSize; i++) {
+            d[i] = (Math.random() * 2 - 1) * Math.sin(Math.PI * i / bufSize);
+        }
+        var noise = ctx.createBufferSource();
+        noise.buffer = buf;
+
+        var filter = ctx.createBiquadFilter();
+        filter.type = 'lowpass';
+        filter.frequency.setValueAtTime(320, t);
+
+        var g = ctx.createGain();
+        g.gain.setValueAtTime(0.024, t);
+        g.gain.exponentialRampToValueAtTime(0.001, t + 0.28);
+
+        noise.connect(filter);
+        filter.connect(g);
+        g.connect(masterGain);
+        noise.start(t);
+    }
+
+    // 7. NOTEBOOK:
+    function playPaperFrictionSound() {
+        if (!ctx) return;
+        var t = ctx.currentTime;
+
+        var bufSize = Math.floor(ctx.sampleRate * 0.2);
+        var buf = ctx.createBuffer(1, bufSize, ctx.sampleRate);
+        var d = buf.getChannelData(0);
+        for (var i = 0; i < bufSize; i++) {
+            d[i] = (Math.random() * 2 - 1) * Math.exp(-i / (bufSize * 0.4));
+        }
+        var noise = ctx.createBufferSource();
+        noise.buffer = buf;
+
+        var filter = ctx.createBiquadFilter();
+        filter.type = 'bandpass';
+        filter.frequency.setValueAtTime(1400, t);
+        filter.Q.setValueAtTime(2.0, t);
+
+        var g = ctx.createGain();
+        g.gain.setValueAtTime(0.018, t);
+        g.gain.exponentialRampToValueAtTime(0.001, t + 0.19);
+
+        noise.connect(filter);
+        filter.connect(g);
+        g.connect(masterGain);
+        noise.start(t);
+    }
+
+    function playNotebookOpenSound() {
+        if (!ctx) return;
+        var t = ctx.currentTime;
+
+        var osc = ctx.createOscillator();
+        var og = ctx.createGain();
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(180, t);
+        osc.frequency.exponentialRampToValueAtTime(110, t + 0.12);
+        og.gain.setValueAtTime(0.022, t);
+        og.gain.exponentialRampToValueAtTime(0.001, t + 0.12);
+        osc.connect(og);
+        og.connect(masterGain);
+        osc.start(t);
+        osc.stop(t + 0.13);
+
+        var bufSize = Math.floor(ctx.sampleRate * 0.35);
+        var buf = ctx.createBuffer(1, bufSize, ctx.sampleRate);
+        var d = buf.getChannelData(0);
+        for (var i = 0; i < bufSize; i++) {
+            d[i] = (Math.random() * 2 - 1) * Math.sin(Math.PI * i / bufSize);
+        }
+        var noise = ctx.createBufferSource();
+        noise.buffer = buf;
+        var filter = ctx.createBiquadFilter();
+        filter.type = 'bandpass';
+        filter.frequency.setValueAtTime(1600, t + 0.04);
+        filter.frequency.exponentialRampToValueAtTime(900, t + 0.32);
+        filter.Q.setValueAtTime(1.5, t + 0.04);
+
+        var g = ctx.createGain();
+        g.gain.setValueAtTime(0.025, t + 0.04);
+        g.gain.exponentialRampToValueAtTime(0.001, t + 0.34);
+
+        noise.connect(filter);
+        filter.connect(g);
+        g.connect(masterGain);
+        noise.start(t + 0.04);
+    }
+
+    function playPageTurnSound() {
+        if (!ctx) return;
+        var t = ctx.currentTime;
+
+        var bufSize = Math.floor(ctx.sampleRate * 0.28);
+        var buf = ctx.createBuffer(1, bufSize, ctx.sampleRate);
+        var d = buf.getChannelData(0);
+        for (var i = 0; i < bufSize; i++) {
+            d[i] = (Math.random() * 2 - 1) * Math.sin(Math.PI * i / bufSize);
+        }
+        var noise = ctx.createBufferSource();
+        noise.buffer = buf;
+
+        var filter = ctx.createBiquadFilter();
+        filter.type = 'bandpass';
+        filter.frequency.setValueAtTime(2200, t);
+        filter.frequency.exponentialRampToValueAtTime(1100, t + 0.26);
+        filter.Q.setValueAtTime(2.2, t);
+
+        var g = ctx.createGain();
+        g.gain.setValueAtTime(0.024, t);
+        g.gain.exponentialRampToValueAtTime(0.001, t + 0.27);
+
+        noise.connect(filter);
+        filter.connect(g);
+        g.connect(masterGain);
+        noise.start(t);
+    }
+
+    // 8. PHONE: Subtle muted vibration notification (generic, NOT WhatsApp)
+    function playPhoneVibSound() {
+        if (!ctx) return;
+        var t = ctx.currentTime;
+
+        [0, 0.14].forEach(function(delay) {
+            var osc = ctx.createOscillator();
+            var g = ctx.createGain();
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(75, t + delay);
+            g.gain.setValueAtTime(0.035, t + delay);
+            g.gain.exponentialRampToValueAtTime(0.001, t + delay + 0.09);
+
+            osc.connect(g);
+            g.connect(masterGain);
+            osc.start(t + delay);
+            osc.stop(t + delay + 0.095);
+        });
+    }
+
+    // 9. BOOKSHELF: Quiet wooden resonance & subtle book movement
+    function playBookshelfSound() {
+        if (!ctx) return;
+        var t = ctx.currentTime;
+
+        var osc = ctx.createOscillator();
+        var g = ctx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(140, t);
+        osc.frequency.exponentialRampToValueAtTime(90, t + 0.25);
+        g.gain.setValueAtTime(0.025, t);
+        g.gain.exponentialRampToValueAtTime(0.001, t + 0.25);
+        osc.connect(g);
+        g.connect(masterGain);
+        osc.start(t);
+        osc.stop(t + 0.26);
+
+        var bufSize = Math.floor(ctx.sampleRate * 0.25);
+        var buf = ctx.createBuffer(1, bufSize, ctx.sampleRate);
+        var d = buf.getChannelData(0);
+        for (var i = 0; i < bufSize; i++) {
+            d[i] = (Math.random() * 2 - 1) * Math.sin(Math.PI * i / bufSize);
+        }
+        var noise = ctx.createBufferSource();
+        noise.buffer = buf;
+
+        var filter = ctx.createBiquadFilter();
+        filter.type = 'bandpass';
+        filter.frequency.setValueAtTime(550, t);
+        filter.Q.setValueAtTime(1.5, t);
+
+        var ng = ctx.createGain();
+        ng.gain.setValueAtTime(0.018, t);
+        ng.gain.exponentialRampToValueAtTime(0.001, t + 0.24);
+
+        noise.connect(filter);
+        filter.connect(ng);
+        ng.connect(masterGain);
+        noise.start(t);
+    }
+
+    // 10. BOOK: Soft book movement / opening sound & paper sounds
+    function playBookOpenSound() {
+        if (!ctx) return;
+        var t = ctx.currentTime;
+
+        var bufSize = Math.floor(ctx.sampleRate * 0.4);
+        var buf = ctx.createBuffer(1, bufSize, ctx.sampleRate);
+        var d = buf.getChannelData(0);
+        for (var i = 0; i < bufSize; i++) {
+            d[i] = (Math.random() * 2 - 1) * Math.sin(Math.PI * i / bufSize);
+        }
+        var noise = ctx.createBufferSource();
+        noise.buffer = buf;
+
+        var filter = ctx.createBiquadFilter();
+        filter.type = 'bandpass';
+        filter.frequency.setValueAtTime(1200, t);
+        filter.frequency.exponentialRampToValueAtTime(700, t + 0.38);
+        filter.Q.setValueAtTime(1.8, t);
+
+        var g = ctx.createGain();
+        g.gain.setValueAtTime(0.026, t);
+        g.gain.exponentialRampToValueAtTime(0.001, t + 0.38);
+
+        noise.connect(filter);
+        filter.connect(g);
+        g.connect(masterGain);
+        noise.start(t);
+    }
+
+    // 11. ZOOM TRANSITIONS: (Desactivado — silencioso, solo foleys de objetos)
+    function playZoomSwell(durSec) {}
+
+    // Auto-iniciar la música inmediatamente al cargar la página o en cualquier interacción
+    unlockAudio();
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', unlockAudio);
+    }
+    window.addEventListener('load', unlockAudio);
+    ['mousemove', 'pointermove', 'pointerdown', 'mousedown', 'touchstart', 'keydown', 'scroll', 'wheel'].forEach(function(evt) {
+        window.addEventListener(evt, unlockAudio, { passive: true });
+    });
+
+    // Registrar handler de clic en el botón de audio UI
+    function initAudioBtn() {
+        var btn = document.getElementById('audio-toggle-btn');
+        if (btn) {
+            btn.addEventListener('click', function(e) {
+                e.stopPropagation();
+                unlockAudio();
+                toggleBgMusic();
+            });
+        }
+    }
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', initAudioBtn);
+    } else {
+        initAudioBtn();
+    }
+
+    return {
+        unlock: unlockAudio,
+        toggleBgMusic: toggleBgMusic,
+        fadeOutBgMusic: fadeOutBgMusic,
+        playBed: playBedSound,
+        playPillow: playPillowSound,
+        playMedication: playMedicationSound,
+        playLamp: playLampSound,
+        playDesk: playDeskSound,
+        playPaperFriction: playPaperFrictionSound,
+        playNotebookOpen: playNotebookOpenSound,
+        playPageTurn: playPageTurnSound,
+        playPhoneVib: playPhoneVibSound,
+        playBookshelf: playBookshelfSound,
+        playBookOpen: playBookOpenSound,
+        playZoomSwell: playZoomSwell
+    };
+})();
+
+/* ═══════════════════════════════════════════════════════════════
+   ESCENA 2 — Can U feel me?
+   OBSERVAR → DESCUBRIR → ACERCARSE → REVELAR → TRANSFORMAR
+   → VOLVER
+═══════════════════════════════════════════════════════════════ */
+(function () {
+    'use strict';
+
+    /* ── Refs cama (escena 2) ── */
+    var s2El       = document.getElementById('s2');
+    var remedioSpotlight = document.getElementById('remedio-spotlight');
+    var stage      = document.getElementById('s2-stage');
+    var zoomer     = document.getElementById('s2-zoomer');
+    var lCama      = document.getElementById('l-cama');
+    var lAlmohada  = document.getElementById('l-almohada');
+    var lRemedio   = document.getElementById('l-remedio');
+    var hsCama     = document.getElementById('hs-cama');
+    var hsAlmohada = document.getElementById('hs-almohada');
+    var hsRemedio  = document.getElementById('hs-remedio');
+    var remedioFg  = document.getElementById('remedio-fg');
+    var remedioGif = document.getElementById('remedio-gif');
+    var returnHint = document.getElementById('return-hint');
+    var introFade  = document.getElementById('intro-fade');
+
+    /* ── Refs escritorio (escena 3) ── */
+    var lEscritorio  = document.getElementById('l-escritorio');
+    var lCuaderno    = document.getElementById('l-cuaderno');
+    var lCelular     = document.getElementById('l-celular');
+    var hsEscritorio = document.getElementById('hs-escritorio');
+    var hsCuaderno   = document.getElementById('hs-cuaderno');
+    var hsCelular    = document.getElementById('hs-celular');
+
+    /* ── Estado del celular ── */
+    var celularUnlocked = false; /* se desbloquea tras usar el cuaderno */
+
+    /* ── Refs cuaderno viewer ── */
+    var cOverlay  = document.getElementById('cuaderno-overlay');
+    var cWrap     = document.getElementById('cuaderno-wrap');
+    var cBase     = document.getElementById('c-base');
+    var cCurrent  = document.getElementById('c-current');
+    var cFlip     = document.getElementById('c-flip');
+    var cZoneL    = document.getElementById('c-zone-left');
+    var cZoneR    = document.getElementById('c-zone-right');
+    var cCounter  = document.getElementById('c-counter');
+    var cClose    = document.getElementById('c-close');
+
+    /* ── Estados escena 2 (cama) ── */
+    var S = {
+        INIT: 0, BED: 1, ZOOMING: 2,
+        PILLOW: 3, FADING: 4, REMEDIO: 5,
+        ZOOM_REM: 6, GIF: 7, RETURNING: 8
+    };
+    var state = S.INIT;
+
+    /* ── Estado escena 3 (escritorio) ── */
+    /* s3Unlocked: true luego del primer click a la cama */
+    var s3Unlocked   = false;
+    var s3Active     = false;
+    /* s3InDesk: true cuando el usuario está en zoom del escritorio */
+    var s3InDesk     = false;
+
+    var S3_ZOOM_SCALE  = 2.5;
+    var S3_ZOOM_DUR    = 2800;
+    var S3_ZOOM_BACK   = 2800;
+    /* Origen del zoom hacia el escritorio:
+       centro escritorio = (652+308, 428+195) = (960, 623)
+       como % de 1920×1080: 50%, 57.7% */
+    var S3_ORIGIN = '61% 55%';
+
+    /* ── Dimensiones de diseño ── */
+    var DW = 1920, DH = 1080;
+    var ZOOM_SCALE   = 3.5;
+    var ZOOM_DUR_MS  = 2500;  /* 2.5s zoom suave y ágil */
+    var ZOOM_BACK_MS = 2200;
+
+    /* ══════════════════════════════════════════
+       ESCALADO DEL STAGE — modo cover
+    ══════════════════════════════════════════ */
+    function scaleStage() {
+        var sc = Math.max(window.innerWidth / DW, window.innerHeight / DH);
+        stage.style.transform = 'translate(-50%,-50%) scale(' + sc + ')';
+    }
+    scaleStage();
+    window.addEventListener('resize', scaleStage);
+
+    /* ══════════════════════════════════════════
+       TRANSFORM-ORIGIN DEL ZOOM
+       Apunta al centro de la almohada en coordenadas del stage.
+
+       Almohada: left=355, top=580, width=270
+       Centro almohada aprox: x=490, y=670
+       Como % del stage 1920×1080: x=25.5%, y=62%
+    ══════════════════════════════════════════ */
+    zoomer.style.transformOrigin = '25.5% 62%';
+
+    /* ══════════════════════════════════════════
+       ENTRADA — el fade lo maneja el CSS
+       JS activa la cama tras el fade
+    ══════════════════════════════════════════ */
+    introFade.classList.add('gone');
+    activateBed();
+
+    /* ══════════════════════════════════════════
+       ESTADO 1 — CAMA INTERACTIVA
+       Pulsación lenta como una respiración.
+    ══════════════════════════════════════════ */
+    function activateBed() {
+        state = S.BED;
+        lCama.classList.add('breathing');
+        lCama.style.pointerEvents = 'auto';
+        lCama.style.cursor = 'pointer';
+        hsCama.classList.add('active');
+        hsCama.addEventListener('mouseenter', onBedEnter);
+        hsCama.addEventListener('mouseleave', onBedLeave);
+        hsCama.addEventListener('click',      onBedClick);
+        lCama.addEventListener('mouseenter',  onBedEnter);
+        lCama.addEventListener('mouseleave',  onBedLeave);
+        lCama.addEventListener('click',       onBedClick);
+
+        /* Permitir clic en toda la zona (cama y almohada) en la fase inicial */
+        lAlmohada.style.pointerEvents = 'auto';
+        lAlmohada.style.cursor = 'pointer';
+        lAlmohada.addEventListener('click', onBedClick);
+        hsAlmohada.classList.add('active');
+        hsAlmohada.addEventListener('click', onBedClick);
+    }
+
+    function onBedEnter() {
+        if (state === S.BED) lCama.classList.add('hvr');
+    }
+    function onBedLeave() {
+        lCama.classList.remove('hvr');
+    }
+
+    /* ── Clic en la cama ── */
+    function onBedClick(e) {
+        if (e) e.stopPropagation();
+        if (state !== S.BED) return;
+        state = S.ZOOMING;
+
+        BedroomAudio.playBed();
+
+        /* Desbloquear escritorio en la primera interacción con la cama */
+        if (!s3Unlocked) s3Unlocked = true;
+
+        /* Pausar escritorio si estaba activo */
+        if (s3Active) {
+            s3Active = false;
+            hsEscritorio.classList.remove('active');
+            lEscritorio.classList.remove('s3-breathing', 'hvr', 's3-stop');
+        }
+
+        hsCama.classList.remove('active');
+        hsCama.removeEventListener('mouseenter', onBedEnter);
+        hsCama.removeEventListener('mouseleave', onBedLeave);
+        hsCama.removeEventListener('click',      onBedClick);
+        lCama.style.pointerEvents = 'none';
+        lCama.removeEventListener('mouseenter',  onBedEnter);
+        lCama.removeEventListener('mouseleave',  onBedLeave);
+        lCama.removeEventListener('click',       onBedClick);
+        lAlmohada.style.pointerEvents = 'none';
+        lAlmohada.removeEventListener('click',   onBedClick);
+        hsAlmohada.classList.remove('active');
+        hsAlmohada.removeEventListener('click',  onBedClick);
+        lCama.classList.remove('hvr', 'breathing');
+        lCama.classList.add('stop-anim');
+
+        /* Restaurar transform-origin al de la cama antes de zoom */
+        zoomer.style.transformOrigin = '25.5% 62%';
+
+        doZoom();
+    }
+
+    /* ══════════════════════════════════════════
+       ZOOM CINEMATOGRÁFICO HACIA LA ALMOHADA
+    ══════════════════════════════════════════ */
+    function doZoom() {
+        if (s2El) s2El.classList.add('zoomed');
+        /* Easing cinematográfico: arranca suave, cruza con fluidez, frena suave.
+           cubic-bezier(0.45, 0.05, 0.55, 0.95) — smooth in-out, sin tirones. */
+        zoomer.style.transition =
+            'transform ' + (ZOOM_DUR_MS / 1000).toFixed(1) + 's cubic-bezier(0.45,0.05,0.55,0.95)';
+        void zoomer.offsetWidth; /* force reflow */
+        zoomer.style.transform = 'scale(' + ZOOM_SCALE + ')';
+        setTimeout(activatePillow, ZOOM_DUR_MS + 200);
+    }
+
+    /* ══════════════════════════════════════════
+       ESTADO 3 — ALMOHADA INTERACTIVA
+    ══════════════════════════════════════════ */
+    function activatePillow() {
+        state = S.PILLOW;
+        zoomer.style.transition = 'none'; /* quitar transición ya terminada */
+
+        lAlmohada.classList.add('glowing');
+        lAlmohada.style.pointerEvents = 'auto';
+        lAlmohada.style.cursor = 'pointer';
+        hsAlmohada.classList.add('active');
+        hsAlmohada.addEventListener('mouseenter', onPillowEnter);
+        hsAlmohada.addEventListener('mouseleave', onPillowLeave);
+        hsAlmohada.addEventListener('click',      onPillowClick);
+        lAlmohada.addEventListener('mouseenter',  onPillowEnter);
+        lAlmohada.addEventListener('mouseleave',  onPillowLeave);
+        lAlmohada.addEventListener('click',       onPillowClick);
+    }
+
+    function onPillowEnter() {
+        if (state === S.PILLOW) lAlmohada.classList.add('hvr');
+    }
+    function onPillowLeave() {
+        lAlmohada.classList.remove('hvr');
+    }
+
+    /* ── Clic en la almohada ── */
+    function onPillowClick(e) {
+        if (e) e.stopPropagation();
+        if (state !== S.PILLOW) return;
+        state = S.FADING;
+
+        BedroomAudio.playPillow();
+
+        hsAlmohada.classList.remove('active');
+        hsAlmohada.removeEventListener('mouseenter', onPillowEnter);
+        hsAlmohada.removeEventListener('mouseleave', onPillowLeave);
+        hsAlmohada.removeEventListener('click',      onPillowClick);
+        lAlmohada.style.pointerEvents = 'none';
+        lAlmohada.removeEventListener('mouseenter',  onPillowEnter);
+        lAlmohada.removeEventListener('mouseleave',  onPillowLeave);
+        lAlmohada.removeEventListener('click',       onPillowClick);
+        lAlmohada.classList.remove('hvr', 'glowing');
+
+        /* Fade out orgánico de la almohada */
+        lAlmohada.style.opacity = '0';
+
+        /* El remedio siempre estuvo ahí, lo descubrimos */
+        setTimeout(function () {
+            lRemedio.style.opacity = '1';
+            BedroomAudio.playMedication();
+        }, 250);
+
+        setTimeout(activateRemedio, 900);
+    }
+
+    /* ══════════════════════════════════════════
+       ESTADO 5 — REMEDIO INTERACTIVO (descubierto)
+    ══════════════════════════════════════════ */
+    function activateRemedio() {
+        state = S.REMEDIO;
+        lRemedio.classList.add('discovered');
+        lRemedio.style.pointerEvents = 'auto';
+        lRemedio.style.cursor = 'pointer';
+        hsRemedio.classList.add('active');
+        hsRemedio.addEventListener('mouseenter', onRemedioEnter);
+        hsRemedio.addEventListener('mouseleave', onRemedioLeave);
+        hsRemedio.addEventListener('click',      onRemedioClick);
+        lRemedio.addEventListener('mouseenter',  onRemedioEnter);
+        lRemedio.addEventListener('mouseleave',  onRemedioLeave);
+        lRemedio.addEventListener('click',       onRemedioClick);
+    }
+
+    function onRemedioEnter() {
+        if (state === S.REMEDIO) lRemedio.classList.add('hvr');
+    }
+    function onRemedioLeave() {
+        lRemedio.classList.remove('hvr');
+    }
+
+    /* ── Clic en el remedio ── */
+    function onRemedioClick(e) {
+        if (e) e.stopPropagation();
+        if (state !== S.REMEDIO) return;
+        state = S.ZOOM_REM;
+
+        BedroomAudio.playMedication();
+
+        hsRemedio.classList.remove('active');
+        hsRemedio.removeEventListener('mouseenter', onRemedioEnter);
+        hsRemedio.removeEventListener('mouseleave', onRemedioLeave);
+        hsRemedio.removeEventListener('click',      onRemedioClick);
+        lRemedio.style.pointerEvents = 'none';
+        lRemedio.removeEventListener('mouseenter',  onRemedioEnter);
+        lRemedio.removeEventListener('mouseleave',  onRemedioLeave);
+        lRemedio.removeEventListener('click',       onRemedioClick);
+        lRemedio.classList.remove('discovered', 'hvr');
+
+        startRemedioApproach();
+    }
+
+    /* ════════════════════════════════════════════
+       TRANSICIÓN: REMEDIO SE ACERCA A CÁMARA
+       Comienza pequeño y de costado (rotado -80°),
+       crece hasta el tamaño del GIF mientras se orienta.
+       Sin corte visible entre remedio.png y remedio.gif.
+    ════════════════════════════════════════════ */
+    function startRemedioApproach() {
+        var CSS_ROT = 82; /* grados de rotación del remedio acostado en la escena */
+
+        /* Centro del remedio en viewport — getBoundingClientRect() ya incluye la rotación CSS */
+        var rect    = lRemedio.getBoundingClientRect();
+        var startCX = rect.left + rect.width  / 2;
+        var startCY = rect.top  + rect.height / 2;
+
+        /* Aspect ratio natural de Remedio.png */
+        var nw     = lRemedio.naturalWidth  || 60;
+        var nh     = lRemedio.naturalHeight || 92;
+        var aspect = nw / nh;
+
+        /* Tamaño en viewport del elemento SIN rotación (design space × stageScale) */
+        var stSc = Math.max(window.innerWidth / 1920, window.innerHeight / 1080);
+        var dW   = 60;          /* width en design space */
+        var dH   = dW / aspect; /* height proporcional */
+        var scrW = dW * stSc;
+        var scrH = dH * stSc;
+
+        /* Tamaño destino: igualar exactamente al GIF (88 vh de alto) */
+        var vh       = window.innerHeight;
+        var targetH  = vh * 0.88;
+        var scFactor = targetH / scrH; /* escala total necesaria */
+
+        /* Centro destino = centro del viewport */
+        var vw = window.innerWidth;
+        var dx = vw / 2 - startCX;
+        var dy = vh / 2 - startCY;
+
+        if (remedioSpotlight) remedioSpotlight.classList.add('visible');
+
+        /* Inicializar remedioFg en la misma posición, tamaño y rotación que el remedio */
+        remedioFg.style.display  = 'block';
+        remedioFg.style.width    = scrW + 'px';
+        remedioFg.style.height   = scrH + 'px';
+        remedioFg.style.left     = (startCX - scrW / 2) + 'px';
+        remedioFg.style.top      = (startCY - scrH / 2) + 'px';
+        remedioFg.style.transformOrigin = 'center center';
+        remedioFg.style.transform  = 'rotate(' + CSS_ROT + 'deg)';
+        remedioFg.style.opacity    = '1';
+        remedioFg.style.transition = 'none';
+
+        /* Ocultar el original del stage */
+        lRemedio.style.transition = 'none';
+        lRemedio.style.opacity    = '0';
+        lRemedio.classList.remove('discovered', 'hvr');
+
+        /* GIF: iniciar invisible */
+        remedioGif.style.opacity   = '0';
+        remedioGif.style.transition = 'none';
+
+        var DUR = 3000;
+        var t0  = null;
+
+        function eio(t) { return t < 0.5 ? 4*t*t*t : 1 - Math.pow(-2*t+2,3)/2; }
+
+        function frame(ts) {
+            if (!t0) t0 = ts;
+            var t = Math.min((ts - t0) / DUR, 1);
+            var e = eio(t);
+
+            /* Escala: crece de 1 a scFactor (tamaño del GIF) */
+            var sc  = 1 + (scFactor - 1) * e;
+            /* Posición: se mueve al centro */
+            var tx  = dx * e;
+            var ty  = dy * e;
+            /* Rotación: de CSS_ROT grados a 0 (se orienta mientras se acerca) */
+            var rot = CSS_ROT * (1 - e);
+
+            remedioFg.style.transform =
+                'translate(' + tx.toFixed(1) + 'px,' + ty.toFixed(1) + 'px)' +
+                ' scale(' + sc.toFixed(4) + ')' +
+                ' rotate(' + rot.toFixed(2) + 'deg)';
+
+            /* remedio.png se desvanece entre t=0.45 y t=0.80 */
+            var fgA = 1 - Math.max(0, Math.min(1, (t - 0.45) / 0.32));
+            remedioFg.style.opacity = Math.max(0, fgA).toFixed(3);
+
+            /* remedio.gif aparece entre t=0.52 y t=0.82, continuando el movimiento */
+            if (t >= 0.52) {
+                var gifA = Math.min(1, (t - 0.52) / 0.28);
+                remedioGif.style.opacity = gifA.toFixed(3);
+            }
+
+            if (t < 1) {
+                requestAnimationFrame(frame);
+            } else {
+                remedioFg.style.opacity = '0';
+                remedioFg.style.display = 'none';
+                remedioGif.style.opacity = '1';
+                remedioGif.classList.add('visible');
+                state = S.GIF;
+
+                setTimeout(function () {
+                    returnHint.classList.add('visible');
+                }, 3500);
+
+                remedioGif.addEventListener('click', onReturnClick);
+            }
+        }
+
+        requestAnimationFrame(function () {
+            requestAnimationFrame(function () {
+                requestAnimationFrame(frame);
+            });
+        });
+    }
+
+    /* ══════════════════════════════════════════
+       VOLVER A LA HABITACIÓN
+       GIF fade out → zoom back → bed state
+    ══════════════════════════════════════════ */
+    function onReturnClick() {
+        if (state !== S.GIF) return;
+        state = S.RETURNING;
+
+        remedioGif.removeEventListener('click', onReturnClick);
+        remedioGif.classList.remove('visible');
+
+        if (remedioSpotlight) remedioSpotlight.classList.remove('visible');
+
+        /* Ocultar hint */
+        returnHint.classList.remove('visible');
+
+        /* 1. Fade out del GIF */
+        remedioGif.style.transition = 'opacity 1.0s ease';
+        remedioGif.style.opacity    = '0';
+
+        setTimeout(function () {
+            /* 2. Mientras el GIF fade: restaurar room elements
+               (ocurre mientras el gif aún se ve, invisible al usuario) */
+            lRemedio.style.transition = 'none';
+            lRemedio.style.opacity    = '0';
+            lRemedio.classList.remove('discovered', 'hvr');
+
+            lAlmohada.style.transition = 'none';
+            lAlmohada.style.opacity    = '1';
+            lAlmohada.classList.remove('glowing', 'hvr');
+
+            remedioFg.style.display = 'none';
+            remedioGif.style.pointer = 'none';
+            remedioGif.style.transition = 'none';
+            remedioGif.style.opacity = '0';
+
+            /* 3. Zoom back out */
+            zoomer.style.transition =
+                'transform ' + (ZOOM_BACK_MS / 1000).toFixed(1) + 's cubic-bezier(0.16,0.01,0.08,1.0)';
+            void zoomer.offsetWidth;
+            zoomer.style.transform = 'scale(1)';
+
+            /* 4. Después del zoom back: reactivar la cama */
+            setTimeout(function () {
+                zoomer.style.transition = 'none';
+
+                lCama.classList.remove('stop-anim');
+                void lCama.offsetWidth; /* reset animation */
+
+                activateBed();
+
+                /* Activar/reactivar escritorio si ya fue desbloqueado */
+                if (s3Unlocked) {
+                    s3Active = true;
+                    activateDesk();
+                }
+            }, ZOOM_BACK_MS + 200);
+
+        }, 600); /* empieza la restauración mientras el gif termina de desvanecerse */
+    }
+
+    /* ════════════════════════════════════════════════════════════════
+       ESCENA 3 — ESCRITORIO
+       activateDesk → click desk → zoom 2.5x → rayo toggle → volver
+    ════════════════════════════════════════════════════════════════ */
+    function activateDesk() {
+        s3Active = true;
+        lEscritorio.classList.remove('s3-stop');
+        void lEscritorio.offsetWidth;
+        lEscritorio.classList.add('s3-breathing');
+        lEscritorio.style.pointerEvents = 'auto';
+        lEscritorio.style.cursor = 'pointer';
+        hsEscritorio.classList.add('active');
+        hsEscritorio.addEventListener('mouseenter', onDeskEnter);
+        hsEscritorio.addEventListener('mouseleave', onDeskLeave);
+        hsEscritorio.addEventListener('click',      onDeskClick);
+        lEscritorio.addEventListener('mouseenter',  onDeskEnter);
+        lEscritorio.addEventListener('mouseleave',  onDeskLeave);
+        lEscritorio.addEventListener('click',       onDeskClick);
+    }
+
+    function deactivateDesk() {
+        s3Active = false;
+        hsEscritorio.classList.remove('active');
+        hsEscritorio.removeEventListener('mouseenter', onDeskEnter);
+        hsEscritorio.removeEventListener('mouseleave', onDeskLeave);
+        hsEscritorio.removeEventListener('click',      onDeskClick);
+        lEscritorio.style.pointerEvents = 'none';
+        lEscritorio.removeEventListener('mouseenter',  onDeskEnter);
+        lEscritorio.removeEventListener('mouseleave',  onDeskLeave);
+        lEscritorio.removeEventListener('click',       onDeskClick);
+        lEscritorio.classList.remove('s3-breathing', 'hvr');
+        lEscritorio.classList.add('s3-stop');
+    }
+
+    function onDeskEnter() { if (s3Active && !s3InDesk) lEscritorio.classList.add('hvr'); }
+    function onDeskLeave() { lEscritorio.classList.remove('hvr'); }
+
+    function onDeskClick() {
+        if (!s3Active || s3InDesk || state !== S.BED) return;
+        s3InDesk = true;
+
+        BedroomAudio.playDesk();
+
+        /* Pausar la cama mientras se interactúa con el escritorio */
+        hsCama.classList.remove('active');
+        lCama.classList.remove('breathing');
+        lCama.classList.add('stop-anim');
+
+        deactivateDesk();
+
+        /* Actualizar origin al escritorio y hacer zoom */
+        zoomer.style.transformOrigin = S3_ORIGIN;
+        setTimeout(function () {
+            zoomer.style.transition =
+                'transform ' + (S3_ZOOM_DUR / 1000).toFixed(1) + 's cubic-bezier(0.16,0.01,0.08,1.0)';
+            void zoomer.offsetWidth;
+            zoomer.style.transform = 'scale(' + S3_ZOOM_SCALE + ')';
+            setTimeout(activateReturnClick, S3_ZOOM_DUR + 200);
+        }, 400);
+    }
+
+    function onLampEnter() {
+        var lLampara = document.getElementById('l-lampara');
+        if (lLampara) lLampara.classList.add('lamp-hvr');
+    }
+    function onLampLeave() {
+        var lLampara = document.getElementById('l-lampara');
+        if (lLampara) lLampara.classList.remove('lamp-hvr');
+    }
+
+    function onLampClick(e) {
+        if (e) e.stopPropagation();
+        var lLampara = document.getElementById('l-lampara');
+        if (lLampara) lLampara.classList.toggle('lamp-on');
+        BedroomAudio.playLamp();
+    }
+
+    function onCuadernoEnter() {
+        if (lCuaderno) lCuaderno.classList.add('hvr');
+        BedroomAudio.playPaperFriction();
+    }
+    function onCuadernoLeave() {
+        if (lCuaderno) lCuaderno.classList.remove('hvr');
+    }
+
+    function activateReturnClick() {
+        zoomer.style.transition = 'none';
+        zoomer.addEventListener('click', onZoomerClickDesk);
+
+        /* Activar lámpara como clickeable en el escritorio */
+        var lLampara = document.getElementById('l-lampara');
+        var hsLampara = document.getElementById('hs-lampara');
+        if (hsLampara && lLampara) {
+            hsLampara.classList.add('active');
+            hsLampara.style.cursor = 'pointer';
+            lLampara.style.pointerEvents = 'auto';
+            lLampara.style.cursor = 'pointer';
+            hsLampara.addEventListener('mouseenter', onLampEnter);
+            hsLampara.addEventListener('mouseleave', onLampLeave);
+            lLampara.addEventListener('mouseenter', onLampEnter);
+            lLampara.addEventListener('mouseleave', onLampLeave);
+            hsLampara.addEventListener('click', onLampClick);
+            lLampara.addEventListener('click', onLampClick);
+        }
+
+        /* Activar cuaderno como clickeable y brilloso */
+        hsCuaderno.classList.add('active');
+        hsCuaderno.style.cursor = 'pointer';
+        lCuaderno.style.pointerEvents = 'auto';
+        lCuaderno.style.cursor = 'pointer';
+        lCuaderno.classList.add('glowing');
+        hsCuaderno.addEventListener('mouseenter', onCuadernoEnter);
+        hsCuaderno.addEventListener('mouseleave', onCuadernoLeave);
+        lCuaderno.addEventListener('mouseenter', onCuadernoEnter);
+        lCuaderno.addEventListener('mouseleave', onCuadernoLeave);
+        hsCuaderno.addEventListener('click', onCuadernoClick);
+        lCuaderno.addEventListener('click', onCuadernoClick);
+
+        /* Activar celular si ya fue desbloqueado (se detecta via global) */
+        if (window._celularUnlocked) {
+            lCelular.classList.remove('locked');
+            lCelular.classList.add('unlocked');
+            lCelular.style.pointerEvents = 'auto';
+            lCelular.style.cursor = 'pointer';
+            hsCelular.classList.add('active');
+            hsCelular.style.cursor = 'pointer';
+            hsCelular.addEventListener('click', onCelularClick);
+            lCelular.addEventListener('click', onCelularClick);
+        }
+        setTimeout(function () {
+            if (s3InDesk) returnHint.classList.add('visible');
+        }, 5000);
+    }
+
+    function onCelularClick(e) {
+        e.stopPropagation();
+        window.openCelular();
+    }
+
+
+    function onZoomerClickDesk() {
+        if (!s3InDesk) return;
+        startReturnDesk();
+    }
+
+    function startReturnDesk() {
+        if (!s3InDesk) return;
+        s3InDesk = false;
+
+        zoomer.removeEventListener('click', onZoomerClickDesk);
+        returnHint.classList.remove('visible');
+
+        var lLampara = document.getElementById('l-lampara');
+        var hsLampara = document.getElementById('hs-lampara');
+        if (hsLampara && lLampara) {
+            hsLampara.classList.remove('active');
+            hsLampara.removeEventListener('click', onLampClick);
+            lLampara.removeEventListener('click', onLampClick);
+            hsLampara.removeEventListener('mouseenter', onLampEnter);
+            hsLampara.removeEventListener('mouseleave', onLampLeave);
+            lLampara.removeEventListener('mouseenter', onLampEnter);
+            lLampara.removeEventListener('mouseleave', onLampLeave);
+            lLampara.classList.remove('lamp-hvr');
+        }
+
+        /* Desactivar cuaderno */
+        hsCuaderno.classList.remove('active');
+        lCuaderno.classList.remove('glowing', 'hvr');
+        lCuaderno.style.pointerEvents = 'none';
+        hsCuaderno.removeEventListener('mouseenter', onCuadernoEnter);
+        hsCuaderno.removeEventListener('mouseleave', onCuadernoLeave);
+        lCuaderno.removeEventListener('mouseenter', onCuadernoEnter);
+        lCuaderno.removeEventListener('mouseleave', onCuadernoLeave);
+        hsCuaderno.removeEventListener('click', onCuadernoClick);
+        lCuaderno.removeEventListener('click', onCuadernoClick);
+
+        /* Desactivar celular */
+        hsCelular.classList.remove('active');
+        hsCelular.removeEventListener('click', onCelularClick);
+
+        /* Zoom back al cuarto */
+        zoomer.style.transition =
+            'transform ' + (S3_ZOOM_BACK / 1000).toFixed(1) + 's cubic-bezier(0.16,0.01,0.08,1.0)';
+        void zoomer.offsetWidth;
+        zoomer.style.transform = 'scale(1)';
+
+        setTimeout(function () {
+            zoomer.style.transition = 'none';
+
+            /* Reactivar cama y escritorio */
+            lCama.classList.remove('stop-anim');
+            void lCama.offsetWidth;
+            activateBed();
+            activateDesk();
+
+            /* Desbloquear y activar biblioteca */
+            window.unlockBiblioteca();
+            if (typeof window.activateBibliotecaWhenReady === 'function') {
+                window.activateBibliotecaWhenReady();
+            }
+        }, S3_ZOOM_BACK + 200);
+    }
+
+    /* Exponer función para activar el celular desde afuera del IIFE */
+    window.tryActivateCelular = function () {
+        if (!s3InDesk) return;
+        lCelular.classList.remove('locked');
+        lCelular.classList.add('unlocked');
+        hsCelular.classList.add('active');
+        hsCelular.style.cursor = 'pointer';
+        hsCelular.addEventListener('click', onCelularClick);
+    };
+
+    /* ── Coordinación con biblioteca (escena 4) ── */
+    window.isBedReady = function () { return state === S.BED; };
+
+    /* Placeholder; la biblioteca IIFE los sobrescribe */
+    window.unlockBiblioteca = function () {};
+
+    window.pauseScenes = function () {
+        if (state === S.BED) {
+            hsCama.classList.remove('active');
+            hsCama.removeEventListener('mouseenter', onBedEnter);
+            hsCama.removeEventListener('mouseleave', onBedLeave);
+            hsCama.removeEventListener('click',      onBedClick);
+            lCama.classList.remove('breathing', 'hvr');
+            lCama.classList.add('stop-anim');
+        }
+        if (s3Active) deactivateDesk();
+    };
+
+    window.resumeScenes = function () {
+        lCama.classList.remove('stop-anim');
+        void lCama.offsetWidth;
+        activateBed();
+        if (s3Unlocked && !s3Active) activateDesk();
+        if (typeof window.activateBibliotecaWhenReady === 'function') {
+            window.activateBibliotecaWhenReady();
+        }
+    };
+
+})();
+
+/* ═════════════════════════════════════════
+   CUADERNO VIEWER — Lógica independiente
+═════════════════════════════════════════ */
+(function () {
+    'use strict';
+
+    var PAGES = [
+        'cuaderno en blanco.png',
+        'cuaderno hoja 1.png',
+        'cuaderno hoja 2.png',
+        'cuaderno hoja 3.png'
+    ];
+    var FLIP_MS  = 380;   /* duración de cada fase */
+    var TOTAL_MS = 820;   /* FLIP_MS * 2 + pequeño gap */
+
+    var pageIdx  = 0;
+    var flipping = false;
+
+    var overlay  = document.getElementById('cuaderno-overlay');
+    var wrap     = document.getElementById('cuaderno-wrap');
+    var cBase    = document.getElementById('c-base');
+    var cCurrent = document.getElementById('c-current');
+    var cFlip    = document.getElementById('c-flip');
+    var cZoneL   = document.getElementById('c-zone-left');
+    var cZoneR   = document.getElementById('c-zone-right');
+    var cCounter = document.getElementById('c-counter');
+    var cClose   = document.getElementById('c-close');
+
+    /* ── Escalar el wrap al viewport ── */
+    function scaleWrap() {
+        var sc = Math.min(
+            window.innerWidth  * 0.92 / 900,
+            window.innerHeight * 0.88 / 570
+        );
+        wrap.style.transform = 'scale(' + sc + ')';
+    }
+    window.addEventListener('resize', scaleWrap);
+
+    /* ── Actualizar counter ── */
+    function updateCounter() {
+        cCounter.textContent = (pageIdx + 1) + ' / ' + PAGES.length;
+    }
+
+    /* ── Ocultar zonas de click dependiendo del estado ── */
+    function updateZones() {
+        cZoneL.style.pointerEvents = pageIdx > 0 ? 'auto' : 'none';
+        cZoneL.style.opacity       = pageIdx > 0 ? '1' : '0';
+        cZoneR.style.pointerEvents = pageIdx < PAGES.length - 1 ? 'auto' : 'none';
+        cZoneR.style.opacity       = pageIdx < PAGES.length - 1 ? '1' : '0';
+    }
+
+    /* ── Abrir el cuaderno ── */
+    window.openCuaderno = function () {
+        BedroomAudio.playNotebookOpen();
+        pageIdx  = 0;
+        flipping = false;
+        cBase.src    = PAGES[0];
+        cCurrent.src = PAGES[0];
+        cBase.classList.add('loaded');
+        cCurrent.classList.add('loaded');
+        wrap.classList.add('ready');
+        cFlip.style.display = 'none';
+        updateCounter();
+        updateZones();
+        scaleWrap();
+        overlay.classList.add('open');
+        requestAnimationFrame(function () {
+            overlay.classList.add('visible');
+        });
+    };
+
+    /* ── Cerrar el cuaderno ── */
+    function closeCuaderno() {
+        overlay.classList.remove('visible');
+        /* Primera vez que se cierra: desbloquear el celular */
+        if (typeof window.unlockCelular === 'function') {
+            window.unlockCelular();
+        }
+        setTimeout(function () {
+            overlay.classList.remove('open');
+            wrap.classList.remove('ready');
+            cBase.classList.remove('loaded');
+            cCurrent.classList.remove('loaded');
+        }, 520);
+    }
+    cClose.addEventListener('click', closeCuaderno);
+    /* Click fuera del wrap = cerrar */
+    overlay.addEventListener('click', function (e) {
+        if (e.target === overlay) closeCuaderno();
+    });
+
+    /* ────────────────────────────────────────────
+       FLIP ADELANTE (derecha → izquierda)
+       Fase 1: mitad derecha de current colapsa.
+       Fase 2: mitad izquierda de next se despliega.
+    ──────────────────────────────────────────── */
+    function flipForward() {
+        if (flipping || pageIdx >= PAGES.length - 1) return;
+        flipping = true;
+
+        BedroomAudio.playPageTurn();
+
+        var curr = PAGES[pageIdx];
+        var next = PAGES[pageIdx + 1];
+
+        /* Mostrar página siguiente debajo */
+        cBase.src = next;
+
+        /* Fase 1: mitad derecha de current colapsa hacia el lomo */
+        setFlip({
+            left:    '50%',
+            width:   '50%',
+            bg:      curr,
+            bgPos:   'right center',
+            origin:  'left center',
+            anim:    'cCollapseRight ' + FLIP_MS + 'ms ease-in forwards'
+        });
+
+        /* Fase 2: mitad izquierda de next se despliega desde el lomo */
+        setTimeout(function () {
+            setFlip({
+                left:    '0',
+                width:   '50%',
+                bg:      next,
+                bgPos:   'left center',
+                origin:  'right center',
+                anim:    'cUnfoldLeft ' + FLIP_MS + 'ms ease-out forwards'
+            });
+        }, FLIP_MS + 40);
+
+        /* Finalizar */
+        setTimeout(function () {
+            pageIdx++;
+            cCurrent.src = PAGES[pageIdx];
+            cFlip.style.display = 'none';
+            flipping = false;
+            updateCounter();
+            updateZones();
+        }, TOTAL_MS);
+    }
+
+    /* ────────────────────────────────────────────
+       FLIP ATRÁS (izquierda → derecha)
+       Fase 1: mitad izquierda de current colapsa.
+       Fase 2: mitad derecha de prev se despliega.
+    ──────────────────────────────────────────── */
+    function flipBackward() {
+        if (flipping || pageIdx <= 0) return;
+        flipping = true;
+
+        BedroomAudio.playPageTurn();
+
+        var curr = PAGES[pageIdx];
+        var prev = PAGES[pageIdx - 1];
+
+        /* Mostrar página anterior debajo */
+        cBase.src = prev;
+
+        /* Fase 1: mitad izquierda de current colapsa hacia el lomo */
+        setFlip({
+            left:    '0',
+            width:   '50%',
+            bg:      curr,
+            bgPos:   'left center',
+            origin:  'right center',
+            anim:    'cCollapseLeft ' + FLIP_MS + 'ms ease-in forwards'
+        });
+
+        /* Fase 2: mitad derecha de prev se despliega desde el lomo */
+        setTimeout(function () {
+            setFlip({
+                left:    '50%',
+                width:   '50%',
+                bg:      prev,
+                bgPos:   'right center',
+                origin:  'left center',
+                anim:    'cUnfoldRight ' + FLIP_MS + 'ms ease-out forwards'
+            });
+        }, FLIP_MS + 40);
+
+        /* Finalizar */
+        setTimeout(function () {
+            pageIdx--;
+            cCurrent.src = PAGES[pageIdx];
+            cFlip.style.display = 'none';
+            flipping = false;
+            updateCounter();
+            updateZones();
+        }, TOTAL_MS);
+    }
+
+    /* ── Helper: configurar y mostrar el elemento de flip ── */
+    function setFlip(opts) {
+        /* Quitar animación primero para que se reinicie */
+        cFlip.style.animation  = 'none';
+        cFlip.style.display    = 'block';
+        cFlip.style.left       = opts.left;
+        cFlip.style.width      = opts.width;
+        cFlip.style.backgroundImage    = 'url("' + opts.bg.replace(/"/g, '\\"') + '")';
+        cFlip.style.backgroundSize     = '200% 100%';
+        cFlip.style.backgroundPosition = opts.bgPos;
+        cFlip.style.transformOrigin    = opts.origin;
+        /* forzar reflow para que la animación se reinicie */
+        void cFlip.offsetWidth;
+        cFlip.style.animation  = opts.anim;
+    }
+
+    /* ── Eventos de zonas ── */
+    cZoneR.addEventListener('click', flipForward);
+    cZoneL.addEventListener('click', flipBackward);
+
+    /* ── Teclado: flechas ── */
+    document.addEventListener('keydown', function (e) {
+        if (!overlay.classList.contains('visible')) return;
+        if (e.key === 'ArrowRight') flipForward();
+        if (e.key === 'ArrowLeft')  flipBackward();
+        if (e.key === 'Escape')     closeCuaderno();
+    });
+
+})();
+
+/* Conectar hotspot del cuaderno con el viewer */
+function onCuadernoClick(e) {
+    e.stopPropagation();
+    window.openCuaderno();
+}
+
+/* ═════════════════════════════════════════
+   GALERÍA DEL CELULAR
+═════════════════════════════════════════ */
+(function () {
+    'use strict';
+
+    /* Todas las fotos y videos de la carpeta FOTOS SUICI */
+    var MEDIA = [
+        { type: 'img', src: 'FOTOS SUICI/468638320_10161810780826049_5633287581940819252_n.jpg' },
+        { type: 'img', src: 'FOTOS SUICI/Imagen de WhatsApp 2023-11-11 a las 09.53.42_8de7401f.jpg' },
+        { type: 'img', src: 'FOTOS SUICI/RENI.jpg' },
+        { type: 'img', src: 'FOTOS SUICI/c6043c2a-d7f4-4e0c-af51-05f86bec3bc9.jpg' },
+        { type: 'img', src: 'FOTOS SUICI/IMG_0771.JPEG' },
+        { type: 'img', src: 'FOTOS SUICI/IMG_3229.JPEG' },
+        { type: 'img', src: 'FOTOS SUICI/IMG_2016.JPG' },
+        { type: 'img', src: 'FOTOS SUICI/_MG_1057.JPG' },
+        { type: 'img', src: 'FOTOS SUICI/_MG_1105.JPG' },
+        { type: 'img', src: 'FOTOS SUICI/_MG_1181.JPG' },
+        { type: 'img', src: 'FOTOS SUICI/_MG_1897.JPG' },
+        { type: 'img', src: 'FOTOS SUICI/_MG_1898.JPG' },
+        { type: 'img', src: 'FOTOS SUICI/_MG_1922.JPG' },
+        { type: 'img', src: 'FOTOS SUICI/_MG_1926.JPG' },
+        { type: 'img', src: 'FOTOS SUICI/_MG_2028.JPG' },
+        { type: 'img', src: 'FOTOS SUICI/_MG_2042.JPG' },
+        { type: 'vid', src: 'FOTOS SUICI/MVI_1559.MP4', thumb: null },
+        { type: 'vid', src: 'FOTOS SUICI/MVI_1597.MP4', thumb: null },
+        { type: 'vid', src: 'FOTOS SUICI/MVI_1603.MP4', thumb: null },
+    ];
+
+    var viewerIdx = 0;
+
+    window.openGaleria = function () {
+        var screen = document.getElementById('phone-screen');
+        /* Limpiar y construir gallery-app si no existe aún */
+        var existing = document.getElementById('gallery-app');
+        if (!existing) buildGalleryApp();
+        var app = document.getElementById('gallery-app');
+        /* Ocultar msg-app si existe */
+        var msgApp = document.getElementById('msg-app');
+        if (msgApp) msgApp.style.display = 'none';
+        /* Asegurar que está en el screen */
+        if (!app.parentNode || app.parentNode !== screen) screen.appendChild(app);
+        app.classList.add('open');
+        /* Asegurar que el viewer está cerrado */
+        var viewer = document.getElementById('gallery-viewer');
+        if (viewer) viewer.classList.remove('open');
+    };
+
+    function buildGalleryApp() {
+        var screen = document.getElementById('phone-screen');
+
+        var app = document.createElement('div');
+        app.id = 'gallery-app';
+        screen.appendChild(app);
+
+        /* Header */
+        var hdr = document.createElement('div');
+        hdr.id = 'gallery-hdr';
+        hdr.innerHTML =
+            '<span id="gallery-back">‹</span>' +
+            '<span id="gallery-title">galería</span>';
+        app.appendChild(hdr);
+
+        document.getElementById('gallery-back').addEventListener('click', function (e) {
+            e.stopPropagation();
+            closeGalleryApp();
+        });
+
+        /* Grid wrap */
+        var gridWrap = document.createElement('div');
+        gridWrap.id = 'gallery-grid-wrap';
+        app.appendChild(gridWrap);
+
+        var grid = document.createElement('div');
+        grid.className = 'gallery-grid';
+        gridWrap.appendChild(grid);
+
+        MEDIA.forEach(function (m, i) {
+            var thumb = document.createElement('div');
+            thumb.className = 'gallery-thumb';
+
+            if (m.type === 'img') {
+                var img = document.createElement('img');
+                img.src = m.src;
+                img.loading = 'lazy';
+                img.alt = '';
+                thumb.appendChild(img);
+            } else {
+                /* Video thumbnail — generamos via canvas */
+                var vEl = document.createElement('video');
+                vEl.src = m.src;
+                vEl.preload = 'metadata';
+                vEl.muted = true;
+                vEl.style.cssText = 'display:none';
+                thumb.appendChild(vEl);
+
+                var canvas = document.createElement('canvas');
+                canvas.style.cssText = 'width:100%;height:100%;object-fit:cover;display:block;background:#111;';
+                canvas.width = 80; canvas.height = 80;
+                thumb.appendChild(canvas);
+
+                vEl.addEventListener('loadeddata', function () {
+                    vEl.currentTime = Math.min(1, vEl.duration * 0.1);
+                });
+                vEl.addEventListener('seeked', function () {
+                    var ctx = canvas.getContext('2d');
+                    ctx.drawImage(vEl, 0, 0, 80, 80);
+                    /* Si falla dibujamos fondo oscuro - ya está */
+                });
+
+                /* Badge de video */
+                var badge = document.createElement('div');
+                badge.className = 'vid-badge';
+                badge.textContent = '▶ VID';
+                thumb.appendChild(badge);
+            }
+
+            thumb.addEventListener('click', (function (idx) {
+                return function () { openViewer(idx); };
+            })(i));
+
+            grid.appendChild(thumb);
+        });
+
+        /* Viewer */
+        var viewer = document.createElement('div');
+        viewer.id = 'gallery-viewer';
+        app.appendChild(viewer);
+
+        var vHdr = document.createElement('div');
+        vHdr.id = 'viewer-hdr';
+        vHdr.innerHTML =
+            '<span id="viewer-back">✕</span>' +
+            '<span id="viewer-counter">1 / ' + MEDIA.length + '</span>';
+        viewer.appendChild(vHdr);
+
+        document.getElementById('viewer-back').addEventListener('click', function (e) {
+            e.stopPropagation();
+            closeViewer();
+        });
+
+        var vMedia = document.createElement('div');
+        vMedia.id = 'viewer-media';
+        viewer.appendChild(vMedia);
+
+        var vImg = document.createElement('img');
+        vImg.id = 'viewer-img';
+        vImg.alt = '';
+        vMedia.appendChild(vImg);
+
+        var vVid = document.createElement('video');
+        vVid.id = 'viewer-vid';
+        vVid.controls = true;
+        vVid.playsinline = true;
+        vMedia.appendChild(vVid);
+
+        var prevBtn = document.createElement('button');
+        prevBtn.id = 'viewer-prev';
+        prevBtn.className = 'viewer-arrow';
+        prevBtn.textContent = '‹';
+        prevBtn.addEventListener('click', function (e) { e.stopPropagation(); navViewer(-1); });
+        vMedia.appendChild(prevBtn);
+
+        var nextBtn = document.createElement('button');
+        nextBtn.id = 'viewer-next';
+        nextBtn.className = 'viewer-arrow';
+        nextBtn.textContent = '›';
+        nextBtn.addEventListener('click', function (e) { e.stopPropagation(); navViewer(1); });
+        vMedia.appendChild(nextBtn);
+    }
+
+    function openViewer(idx) {
+        viewerIdx = idx;
+        var viewer = document.getElementById('gallery-viewer');
+        showViewerMedia();
+        viewer.classList.add('open');
+    }
+
+    function closeViewer() {
+        var viewer  = document.getElementById('gallery-viewer');
+        var vVid    = document.getElementById('viewer-vid');
+        if (vVid) { vVid.pause(); vVid.src = ''; }
+        viewer.classList.remove('open');
+    }
+
+    function navViewer(dir) {
+        viewerIdx = (viewerIdx + dir + MEDIA.length) % MEDIA.length;
+        showViewerMedia();
+    }
+
+    function showViewerMedia() {
+        var m       = MEDIA[viewerIdx];
+        var vImg    = document.getElementById('viewer-img');
+        var vVid    = document.getElementById('viewer-vid');
+        var counter = document.getElementById('viewer-counter');
+        var prevBtn = document.getElementById('viewer-prev');
+        var nextBtn = document.getElementById('viewer-next');
+
+        counter.textContent = (viewerIdx + 1) + ' / ' + MEDIA.length;
+        prevBtn.style.display = MEDIA.length > 1 ? 'block' : 'none';
+        nextBtn.style.display = MEDIA.length > 1 ? 'block' : 'none';
+
+        if (m.type === 'img') {
+            vVid.pause();
+            vVid.src = '';
+            vVid.style.display = 'none';
+            vImg.style.display = 'block';
+            vImg.src = m.src;
+        } else {
+            vImg.style.display = 'none';
+            vImg.src = '';
+            vVid.style.display = 'block';
+            vVid.src = m.src;
+            vVid.load();
+        }
+    }
+
+    function closeGalleryApp() {
+        var app = document.getElementById('gallery-app');
+        if (app) app.classList.remove('open');
+        /* Volver a la home del celular */
+        var homeScreen = document.getElementById('phone-home-screen');
+        var msgApp = document.getElementById('msg-app');
+        if (homeScreen) homeScreen.style.display = 'flex';
+        if (msgApp) msgApp.style.display = 'none';
+    }
+
+})();
+
+/* ═════════════════════════════════════════
+   CELULAR — Mensajería ficticia
+═════════════════════════════════════════ */
+(function () {
+    'use strict';
+
+    /* ── Conversaciones ────────────────────────────────────── */
+    var CONTACTS = [
+        {
+            id: 'feli', name: 'Feli ☻',
+            preview: 'estás?', time: '18:42',
+            bg: '#2c1200', accent: '#c4813a',
+            msgs: [
+                { me: true,  t: '18:31', text: 'felipe' },
+                { me: false, t: '18:32', text: 'q onda' },
+                { me: true,  t: '18:33', text: 'estás haciendo algo?' },
+                { me: false, t: '18:35', text: 'si, estoy afuera' },
+                { me: true,  t: '18:35', text: 'ahh' },
+                { me: false, t: '18:36', text: 'por?' },
+                { me: true,  t: '18:37', text: 'quería preguntarte algo' },
+                { me: false, t: '18:37', text: 'decime' },
+                { me: true,  t: '18:39', text: 'después mejor' },
+                { me: false, t: '18:40', text: 'jajaj bueno' },
+                { me: false, t: '18:42', text: 'mañana estoy por el centro igual' },
+                { me: true,  t: '18:42', text: 'dale' },
+            ]
+        },
+        {
+            id: 'adri', name: 'Adri',
+            preview: 'después te escribo', time: '17:16',
+            bg: '#061828', accent: '#4a7aaa',
+            msgs: [
+                { me: true,  t: '17:02', text: 'adri' },
+                { me: false, t: '17:04', text: 'qué pasó' },
+                { me: true,  t: '17:05', text: 'hablaste con mamá?' },
+                { me: false, t: '17:06', text: 'hoy no' },
+                { me: true,  t: '17:07', text: 'ah' },
+                { me: false, t: '17:07', text: 'por?' },
+                { me: true,  t: '17:08', text: 'nada' },
+                { me: false, t: '17:09', text: 'llamala vos' },
+                { me: true,  t: '17:10', text: 'ya fue' },
+                { me: false, t: '17:14', text: 'estoy por entrar a laburar' },
+                { me: true,  t: '17:15', text: 'dale' },
+                { me: false, t: '17:16', text: 'después te escribo' },
+            ]
+        },
+        {
+            id: 'meli', name: 'Meli ♥',
+            preview: 'qué te pasa?', time: '15:03',
+            bg: '#220a18', accent: '#a04878',
+            msgs: [
+                { me: false, t: '10:12', text: 'cómo estás' },
+                { me: true,  t: '10:18', text: 'bien' },
+                { me: true,  t: '10:18', text: 'estuve pensando en la abuela' },
+                { me: false, t: '10:19', text: 'ah' },
+                { me: false, t: '10:19', text: 'por qué?' },
+                { me: true,  t: '10:21', text: 'no sé' },
+                { me: true,  t: '10:22', text: 'soñé con ella' },
+                { me: false, t: '10:23', text: 'hace cuánto fue?' },
+                { me: true,  t: '10:25', text: 'dos años en agosto' },
+                { me: false, t: '10:25', text: 'sí' },
+                { me: true,  t: '10:28', text: 'era la única que me entendía de verdad' },
+                { me: true,  t: '10:28', text: 'sin preguntar nada' },
+                { me: false, t: '10:29', text: 'lo sé' },
+                { me: false, t: '10:30', text: 'se notaba cuando estaban juntas' },
+                { me: true,  t: '10:32', text: 'me acuerdo que le contaba todo' },
+                { me: true,  t: '10:33', text: 'y ella no me juzgaba' },
+                { me: true,  t: '10:33', text: 'solo me miraba y me decía que iba a estar bien' },
+                { me: false, t: '10:35', text: 'qué hermoso' },
+                { me: true,  t: '10:37', text: 'la extraño mucho' },
+                { me: false, t: '10:38', text: 'lo sé' },
+                { me: false, t: '10:38', text: 'yo también' },
+                { me: false, t: '14:41', text: 'che mañana vas?' },
+                { me: true,  t: '14:43', text: 'a dónde' },
+                { me: false, t: '14:43', text: 'jajajaj' },
+                { me: false, t: '14:44', text: 'al cumple de lau' },
+                { me: true,  t: '14:48', text: 'ahhh' },
+                { me: true,  t: '14:48', text: 'no sé' },
+                { me: false, t: '14:49', text: 'dale vení' },
+                { me: false, t: '14:49', text: 'va a estar bueno' },
+                { me: true,  t: '14:52', text: 'vemos' },
+                { me: false, t: '15:00', text: 'qué te pasa?' },
+                { me: true,  t: '15:01', text: 'nada' },
+                { me: false, t: '15:01', text: 'mmm' },
+                { me: false, t: '15:01', text: 'te conozco' },
+                { me: true,  t: '15:02', text: 'después te cuento' },
+                { me: false, t: '15:02', text: 'bueno' },
+                { me: false, t: '15:03', text: 'pero vení mañana' },
+            ]
+        },
+        {
+            id: 'santi', name: 'Santi ♥',
+            preview: 'vos también', time: '12:27',
+            bg: '#180f00', accent: '#8a7030',
+            msgs: [
+                { me: false, t: '12:08', text: 'ya comiste?' },
+                { me: true,  t: '12:09', text: 'nop' },
+                { me: false, t: '12:09', text: 'otra vez?' },
+                { me: true,  t: '12:11', text: 'no tengo ganas' },
+                { me: false, t: '12:12', text: 'te llevo algo' },
+                { me: true,  t: '12:13', text: 'no' },
+                { me: false, t: '12:13', text: 'dale' },
+                { me: true,  t: '12:14', text: 'en serio no' },
+                { me: false, t: '12:14', text: 'bueno' },
+                { me: false, t: '12:18', text: 'mañana paso temprano' },
+                { me: true,  t: '12:20', text: 'tan temprano?' },
+                { me: false, t: '12:21', text: '8 y pico' },
+                { me: true,  t: '12:22', text: 'no seas malo' },
+                { me: false, t: '12:23', text: 'jajaj' },
+                { me: true,  t: '12:26', text: 'dormí' },
+                { me: false, t: '12:27', text: 'vos también' },
+            ]
+        },
+    ];
+
+    /* ── Chats viejos sin responder ─────────────────────────── */
+    var OLD_CHATS = [
+        {
+            id: 'lau', name: 'Lau',
+            preview: 'che al final conseguiste lo de la facu?',
+            date: '18 sept.',
+            bg: '#1a1a2a', accent: '#7070aa',
+            msgs: [
+                { me: true,  t: '10:14', text: 'lau te mando el apunte esta tarde' },
+                { me: false, t: '10:16', text: 'dale gracias' },
+                { me: false, t: '18:02', text: 'che al final conseguiste lo de la facu?' },
+            ]
+        },
+        {
+            id: 'mama', name: 'Mamá',
+            preview: 'avisame cuando llegues',
+            date: '16 sept.',
+            bg: '#1a1210', accent: '#886655',
+            msgs: [
+                { me: false, t: '20:41', text: 'comí algo?' },
+                { me: true,  t: '21:02', text: 'si' },
+                { me: false, t: '21:03', text: 'avisame cuando llegues' },
+            ]
+        },
+        {
+            id: 'prece', name: 'Gaby (preceptora)',
+            preview: 'profe los del 3C no tienen aula mañana',
+            date: '12 sept.',
+            bg: '#0e1818', accent: '#448877',
+            msgs: [
+                { me: false, t: '14:03', text: 'profe los del 3C no tienen aula mañana' },
+                { me: false, t: '14:04', text: 'los mando a biblioteca?' },
+            ]
+        },
+        {
+            id: 'colega', name: 'Marcelo (profe)',
+            preview: 'te mandé el cronograma del trimestre',
+            date: '10 sept.',
+            bg: '#181420', accent: '#776688',
+            msgs: [
+                { me: false, t: '20:15', text: 'profe te mandé el cronograma del trimestre' },
+                { me: false, t: '20:15', text: 'fijate si está bien o lo corrijo' },
+            ]
+        },
+        {
+            id: 'prece2', name: 'Escuela',
+            preview: 'las actas de agosto todavía no están',
+            date: '6 sept.',
+            bg: '#101818', accent: '#448866',
+            msgs: [
+                { me: false, t: '11:00', text: 'buen día profe' },
+                { me: false, t: '11:01', text: 'las actas de agosto todavía no están cargadas' },
+                { me: false, t: '11:01', text: 'cuando pueda las sube' },
+            ]
+        },
+        {
+            id: 'tio', name: 'Tío Claudio',
+            preview: 'hace rato que no te veo',
+            date: '28 ago.',
+            bg: '#141a10', accent: '#558844',
+            msgs: [
+                { me: false, t: '18:00', text: 'cuándo nos juntamos' },
+                { me: false, t: '18:00', text: 'hace rato que no te veo' },
+            ]
+        },
+    ];
+
+    /* ── SVG avatares abstractos ────────────────────────────── */
+    function avatarSVG(c) {
+        var a = c.accent, b = c.bg;
+        if (c.id === 'feli') return '<svg viewBox="0 0 36 36" xmlns="http://www.w3.org/2000/svg"><circle cx="18" cy="18" r="18" fill="' + b + '"/><circle cx="18" cy="18" r="11" fill="none" stroke="' + a + '" stroke-width="1" opacity="0.6"/><path d="M12 20 Q18 25 24 20" stroke="' + a + '" stroke-width="1.4" fill="none" stroke-linecap="round"/><circle cx="14" cy="16" r="1.1" fill="' + a + '" opacity="0.85"/><circle cx="22" cy="16" r="1.1" fill="' + a + '" opacity="0.85"/></svg>';
+        if (c.id === 'adri') return '<svg viewBox="0 0 36 36" xmlns="http://www.w3.org/2000/svg"><circle cx="18" cy="18" r="18" fill="' + b + '"/><line x1="10" y1="15" x2="26" y2="15" stroke="' + a + '" stroke-width="1.4" stroke-linecap="round" opacity="0.85"/><line x1="10" y1="21" x2="26" y2="21" stroke="' + a + '" stroke-width="1.4" stroke-linecap="round" opacity="0.45"/></svg>';
+        if (c.id === 'meli') return '<svg viewBox="0 0 36 36" xmlns="http://www.w3.org/2000/svg"><circle cx="18" cy="18" r="18" fill="' + b + '"/><path d="M18 25 L10.5 17 Q9.5 11.5 14 11.5 Q16 11.5 18 14.5 Q20 11.5 22 11.5 Q26.5 11.5 25.5 17 Z" stroke="' + a + '" stroke-width="1.2" fill="none" stroke-linejoin="round" opacity="0.88"/></svg>';
+        if (c.id === 'santi') return '<svg viewBox="0 0 36 36" xmlns="http://www.w3.org/2000/svg"><circle cx="18" cy="18" r="18" fill="' + b + '"/><path d="M21 10 A9.5 9.5 0 1 0 21 26 A7 7 0 1 1 21 10" fill="' + a + '" opacity="0.72"/></svg>';
+        return '<svg viewBox="0 0 36 36" xmlns="http://www.w3.org/2000/svg"><circle cx="18" cy="18" r="18" fill="' + b + '"/></svg>';
+    }
+
+    /* ── Avatar genérico para chats viejos (círculo simple) ── */
+    function oldAvatarSVG(c) {
+        return '<svg viewBox="0 0 36 36" xmlns="http://www.w3.org/2000/svg"><circle cx="18" cy="18" r="18" fill="' + c.bg + '"/><circle cx="18" cy="18" r="9" fill="none" stroke="' + c.accent + '" stroke-width="1" opacity="0.5"/></svg>';
+    }
+
+    /* ── Construir la app ────────────────────────────────────── */
+    function buildApp() {
+        var screen = document.getElementById('phone-screen');
+
+        /* Ocultar home si existe (no destruirla, para poder volver) */
+        var home = document.getElementById('phone-home-screen');
+        if (home) home.style.display = 'none';
+
+        /* Si msg-app ya existe, solo mostrarla y resetear a la lista */
+        var existing = document.getElementById('msg-app');
+        if (existing) {
+            existing.style.display = 'flex';
+            var chatView = document.getElementById('msg-chat-view');
+            var listView = document.getElementById('msg-list-view');
+            if (chatView) chatView.classList.add('hidden');
+            if (listView) listView.classList.remove('hidden');
+            return;
+        }
+
+        var app = document.createElement('div');
+        app.id = 'msg-app';
+        screen.appendChild(app);
+
+        /* ---- Vista lista ---- */
+        var listView = document.createElement('div');
+        listView.id = 'msg-list-view';
+        listView.className = 'msg-view';
+        app.appendChild(listView);
+
+        var listHdr = document.createElement('div');
+        listHdr.className = 'msg-hdr';
+        listHdr.innerHTML =
+            '<span id="msg-home-back" style="font-family:Georgia,serif;font-size:16px;color:rgba(175,135,255,0.75);cursor:pointer;padding-right:6px;user-select:none;line-height:1;">‹</span>' +
+            '<span style="font-family:Georgia,serif;font-size:9px;letter-spacing:0.18em;color:rgba(255,242,228,0.45);">mensajes</span>';
+        listView.appendChild(listHdr);
+
+        document.getElementById('msg-home-back').addEventListener('click', function (e) {
+            e.stopPropagation();
+            backToHome();
+        });
+
+        function backToHome() {
+            var app = document.getElementById('msg-app');
+            if (app) app.style.display = 'none';
+            var homeScreen = document.getElementById('phone-home-screen');
+            if (homeScreen) homeScreen.style.display = 'flex';
+        }
+
+        var list = document.createElement('div');
+        list.className = 'msg-list';
+        listView.appendChild(list);
+
+        /* Contactos principales */
+        CONTACTS.forEach(function (c) {
+            var item = document.createElement('div');
+            item.className = 'msg-item';
+            item.innerHTML =
+                '<div class="msg-av">' + avatarSVG(c) + '</div>' +
+                '<div class="msg-item-info">' +
+                    '<div class="msg-item-top">' +
+                        '<span class="msg-item-name">' + c.name + '</span>' +
+                        '<span class="msg-item-time">' + c.time + '</span>' +
+                    '</div>' +
+                    '<div class="msg-item-preview">' + c.preview + '</div>' +
+                '</div>';
+            item.addEventListener('click', function () { openChat(c); });
+            list.appendChild(item);
+        });
+
+        /* Separador — chats viejos */
+        var sep = document.createElement('div');
+        sep.style.cssText = [
+            'padding:8px 10px 5px;',
+            'font-family:Georgia,serif;',
+            'font-size:7.5px;',
+            'letter-spacing:0.20em;',
+            'color:rgba(255,242,228,0.22);',
+            'border-top:1px solid rgba(255,255,255,0.05);',
+            'margin-top:4px;',
+            'user-select:none;',
+        ].join('');
+        sep.textContent = 'anteriores';
+        list.appendChild(sep);
+
+        /* Chats viejos sin responder */
+        OLD_CHATS.forEach(function (c) {
+            var item = document.createElement('div');
+            item.className = 'msg-item';
+            item.style.opacity = '0.55';
+            item.innerHTML =
+                '<div class="msg-av" style="width:30px;height:30px;">' + oldAvatarSVG(c) + '</div>' +
+                '<div class="msg-item-info">' +
+                    '<div class="msg-item-top">' +
+                        '<span class="msg-item-name" style="font-size:9px;">' + c.name + '</span>' +
+                        '<span class="msg-item-time" style="color:rgba(175,135,255,0.35);">' + c.date + '</span>' +
+                    '</div>' +
+                    '<div class="msg-item-preview" style="color:rgba(255,242,228,0.28);font-style:italic;">' + c.preview + '</div>' +
+                '</div>';
+            item.addEventListener('click', function () { openOldChat(c); });
+            list.appendChild(item);
+        });
+
+        /* ---- Vista chat ---- */
+        var chatView = document.createElement('div');
+        chatView.id = 'msg-chat-view';
+        chatView.className = 'msg-view hidden';
+        app.appendChild(chatView);
+
+        var chatHdr = document.createElement('div');
+        chatHdr.id = 'msg-chat-hdr';
+        chatHdr.className = 'msg-chat-hdr';
+        chatView.appendChild(chatHdr);
+
+        var bubbles = document.createElement('div');
+        bubbles.id = 'msg-bubbles';
+        bubbles.className = 'msg-bubbles';
+        chatView.appendChild(bubbles);
+    }
+
+    /* ── Abrir un chat ────────────────────────────────────── */
+    function openChat(c) {
+        var listView = document.getElementById('msg-list-view');
+        var chatView = document.getElementById('msg-chat-view');
+        var chatHdr  = document.getElementById('msg-chat-hdr');
+        var bubbles  = document.getElementById('msg-bubbles');
+
+        /* Header del chat */
+        chatHdr.innerHTML =
+            '<span class="msg-back" id="msg-back-btn">‹</span>' +
+            '<div class="msg-av-sm">' + avatarSVG(c) + '</div>' +
+            '<span class="msg-chat-name">' + c.name + '</span>';
+
+        document.getElementById('msg-back-btn').addEventListener('click', function (e) {
+            e.stopPropagation();
+            closeChat();
+        });
+
+        /* Mensajes */
+        bubbles.innerHTML = '';
+        c.msgs.forEach(function (m) {
+            var row = document.createElement('div');
+            row.className = 'msg-row ' + (m.me ? 'me' : 'them');
+            var bubble = document.createElement('div');
+            bubble.className = 'msg-bubble ' + (m.me ? 'me' : 'them');
+            bubble.innerHTML =
+                '<span class="msg-btext">' + m.text + '</span>' +
+                '<span class="msg-btime">' + m.t + '</span>';
+            row.appendChild(bubble);
+            bubbles.appendChild(row);
+        });
+
+        /* Scroll al final */
+        setTimeout(function () { bubbles.scrollTop = bubbles.scrollHeight; }, 20);
+
+        /* Transición */
+        listView.classList.add('hidden');
+        chatView.classList.remove('hidden');
+    }
+
+    function closeChat() {
+        document.getElementById('msg-chat-view').classList.add('hidden');
+        document.getElementById('msg-list-view').classList.remove('hidden');
+    }
+
+    /* ── Abrir chat viejo (solo el último mensaje, fecha, sin respuesta) ── */
+    function openOldChat(c) {
+        var listView = document.getElementById('msg-list-view');
+        var chatView = document.getElementById('msg-chat-view');
+        var chatHdr  = document.getElementById('msg-chat-hdr');
+        var bubbles  = document.getElementById('msg-bubbles');
+
+        chatHdr.innerHTML =
+            '<span class="msg-back" id="msg-back-btn">‹</span>' +
+            '<div class="msg-av-sm" style="opacity:0.55;">' + oldAvatarSVG(c) + '</div>' +
+            '<span class="msg-chat-name" style="opacity:0.65;">' + c.name + '</span>' +
+            '<span style="margin-left:auto;font-family:-apple-system,sans-serif;font-size:7px;color:rgba(175,135,255,0.35);">' + c.date + '</span>';
+
+        document.getElementById('msg-back-btn').addEventListener('click', function (e) {
+            e.stopPropagation();
+            closeChat();
+        });
+
+        bubbles.innerHTML = '';
+
+        /* Fecha como separador */
+        var dateSep = document.createElement('div');
+        dateSep.style.cssText = 'text-align:center;font-family:-apple-system,sans-serif;font-size:7px;color:rgba(175,135,255,0.30);margin:8px 0 10px;letter-spacing:0.10em;';
+        dateSep.textContent = c.date;
+        bubbles.appendChild(dateSep);
+
+        /* Mensajes */
+        c.msgs.forEach(function (m) {
+            var row = document.createElement('div');
+            row.className = 'msg-row ' + (m.me ? 'me' : 'them');
+            var bubble = document.createElement('div');
+            bubble.className = 'msg-bubble ' + (m.me ? 'me' : 'them');
+            bubble.style.opacity = '0.65';
+            bubble.innerHTML =
+                '<span class="msg-btext">' + m.text + '</span>' +
+                '<span class="msg-btime">' + m.t + '</span>';
+            row.appendChild(bubble);
+            bubbles.appendChild(row);
+        });
+
+        /* Nota — sin respuesta */
+        var note = document.createElement('div');
+        note.style.cssText = 'text-align:center;font-family:Georgia,serif;font-style:italic;font-size:7.5px;color:rgba(255,242,228,0.18);margin-top:18px;letter-spacing:0.08em;';
+        note.textContent = 'sin responder';
+        bubbles.appendChild(note);
+
+        setTimeout(function () { bubbles.scrollTop = bubbles.scrollHeight; }, 20);
+
+        listView.classList.add('hidden');
+        chatView.classList.remove('hidden');
+    }
+
+    /* ── Abrir / cerrar overlay ────────────────────────────── */
+    var overlay = document.getElementById('celular-overlay');
+    var closeBtn = document.getElementById('celular-close');
+
+    window.openCelular = function () {
+        BedroomAudio.playPhoneVib();
+        /* Mostrar la home screen del celular */
+        buildHomeScreen();
+        overlay.classList.add('open');
+        requestAnimationFrame(function () { overlay.classList.add('visible'); });
+    };
+
+    function buildHomeScreen() {
+        var screen = document.getElementById('phone-screen');
+
+        /* Ocultar apps abiertas sin destruirlas */
+        var oldMsg = document.getElementById('msg-app');
+        if (oldMsg) oldMsg.style.display = 'none';
+        var oldGallery = document.getElementById('gallery-app');
+        if (oldGallery) oldGallery.classList.remove('open');
+
+        /* Si ya existe la home, solo mostrarla */
+        var existingHome = document.getElementById('phone-home-screen');
+        if (existingHome) {
+            existingHome.style.display = 'flex';
+            return;
+        }
+
+        /* Home screen — primera vez */
+        var home = document.createElement('div');
+        home.id = 'phone-home-screen';
+        screen.appendChild(home);
+
+        /* Fecha en la pantalla */
+        var dateEl = document.createElement('div');
+        dateEl.style.cssText = 'font-family:Georgia,serif;font-size:8px;letter-spacing:0.18em;color:rgba(255,242,228,0.28);margin-bottom:14px;margin-top:4px;';
+        var now = new Date();
+        var days = ['domingo','lunes','martes','miércoles','jueves','viernes','sábado'];
+        var months = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
+        dateEl.textContent = days[now.getDay()] + ', ' + now.getDate() + ' de ' + months[now.getMonth()];
+        home.appendChild(dateEl);
+
+        /* Grid de apps */
+        var grid = document.createElement('div');
+        grid.className = 'phone-app-grid';
+        home.appendChild(grid);
+
+        /* App: Mensajes */
+        var msgIcon = document.createElement('div');
+        msgIcon.className = 'phone-app-icon';
+        msgIcon.innerHTML =
+            '<div class="phone-app-icon-img" style="background:linear-gradient(135deg,#1e0a42,#3a0f80);">💬</div>' +
+            '<span class="phone-app-icon-label">mensajes</span>';
+        msgIcon.addEventListener('click', function (e) {
+            e.stopPropagation();
+            home.style.display = 'none';
+            buildApp();
+        });
+        grid.appendChild(msgIcon);
+
+        /* App: Galería */
+        var galIcon = document.createElement('div');
+        galIcon.className = 'phone-app-icon';
+        galIcon.innerHTML =
+            '<div class="phone-app-icon-img" style="background:linear-gradient(135deg,#0a2a1a,#1a5e38);">🖼️</div>' +
+            '<span class="phone-app-icon-label">galería</span>';
+        galIcon.addEventListener('click', function (e) {
+            e.stopPropagation();
+            home.style.display = 'none';
+            window.openGaleria();
+        });
+        grid.appendChild(galIcon);
+    }
+
+    function closeCelular() {
+        overlay.classList.remove('visible');
+        setTimeout(function () { overlay.classList.remove('open'); }, 480);
+    }
+    closeBtn.addEventListener('click', function (e) { e.stopPropagation(); closeCelular(); });
+    overlay.addEventListener('click', function (e) { if (e.target === overlay) closeCelular(); });
+
+    /* ── Desbloquear (lo llama el cuaderno al cerrarse) ────────── */
+    window.unlockCelular = function () {
+        var lCelular = document.getElementById('l-celular');
+        if (lCelular) { lCelular.classList.remove('locked'); lCelular.classList.add('unlocked'); }
+        window._celularUnlocked = true;
+        if (typeof window.tryActivateCelular === 'function') window.tryActivateCelular();
+    };
+
+})();
+
+/* ═════════════════════════════════════════
+   BIBLIOTECA — Escena 4
+   Flujo: habitación → click biblioteca → zoom in →
+          click libro → tapa → abierto + info → tapa trasera → cerrar
+═════════════════════════════════════════ */
+(function () {
+    'use strict';
+
+    var lBiblioteca  = document.getElementById('l-biblioteca');
+    var lLibros      = document.getElementById('l-libros');
+    var hsBiblioteca = document.getElementById('hs-biblioteca');
+    var hsBook1      = document.getElementById('hs-book-1');
+    var zoomer       = document.getElementById('s2-zoomer');
+
+    /* El overlay del libro está después del bloque de script en el DOM;
+       se inicializa tras DOMContentLoaded para que exista cuando se usa. */
+    var libroOverlay, libroTapa, libroAbWrap, libroPageW, libroStickyWrap, libroHojaPapel, libroInfo, libroTrasera, libroHint, libroClose;
+    var wrapTapa, wrapAbierto, wrapTrasera;
+
+    function initLibroRefs() {
+        libroOverlay    = document.getElementById('libro-overlay');
+        libroTapa       = document.getElementById('libro-tapa');
+        libroAbWrap     = document.getElementById('libro-abierto-wrap');
+        libroPageW      = document.getElementById('libro-page-wash');
+        libroStickyWrap = document.getElementById('libro-sticky-wrapper');
+        libroHojaPapel  = document.getElementById('libro-hoja-papel');
+        libroInfo       = document.getElementById('libro-info');
+        libroTrasera    = document.getElementById('libro-trasera');
+        libroHint       = document.getElementById('libro-hint');
+        libroClose      = document.getElementById('libro-close');
+        wrapTapa        = document.getElementById('wrap-tapa');
+        wrapAbierto     = document.getElementById('wrap-abierto');
+        wrapTrasera     = document.getElementById('wrap-trasera');
+    }
+    if (document.readyState === 'loading') {
+        window.addEventListener('DOMContentLoaded', initLibroRefs);
+    } else {
+        initLibroRefs();
+    }
+
+    /* ── Estado ── */
+    var s4Unlocked = false;
+    var s4Active   = false;
+    var s4InLib    = false;
+
+    var LBOOK = { NONE: 0, TAPA: 1, ABIERTO: 2, TRASERA: 3 };
+    var lbState = LBOOK.NONE;
+
+    var S4_ZOOM_SCALE = 2.5;
+    var S4_ZOOM_DUR   = 2400;
+    var S4_ZOOM_BACK  = 2200;
+
+    /* — Camera moves UPWARDS towards top of bookshelf —
+       Ox=112.5% centers the bookshelf horizontally.
+       Oy=20.0% moves the camera UPWARDS during the zoom in. */
+    function computeLibOrigin() {
+        return '112.5% 20%';
+    }
+
+    /* ── Exponer funciones globales ── */
+    window.unlockBiblioteca = function () {
+        s4Unlocked = true;
+    };
+
+    window.activateBibliotecaWhenReady = function () {
+        if (!s4Unlocked || s4Active) return;
+        s4Active = true;
+        activateLib();
+    };
+
+    /* ══════════════════════════════════════════
+       BIBLIOTECA INTERACTIVA — breathing
+    ══════════════════════════════════════════ */
+    function activateLib() {
+        lBiblioteca.classList.remove('b-stop');
+        void lBiblioteca.offsetWidth;
+        lBiblioteca.classList.add('b-breathing');
+        lLibros.classList.remove('b-stop');
+        void lLibros.offsetWidth;
+        lLibros.classList.add('b-breathing');
+        lBiblioteca.style.pointerEvents = 'auto';
+        lBiblioteca.style.cursor = 'pointer';
+        lLibros.style.pointerEvents = 'auto';
+        lLibros.style.cursor = 'pointer';
+        hsBiblioteca.classList.add('active');
+        hsBiblioteca.addEventListener('mouseenter', onLibEnter);
+        hsBiblioteca.addEventListener('mouseleave', onLibLeave);
+        hsBiblioteca.addEventListener('click',      onLibClick);
+        lBiblioteca.addEventListener('mouseenter',  onLibEnter);
+        lBiblioteca.addEventListener('mouseleave',  onLibLeave);
+        lBiblioteca.addEventListener('click',       onLibClick);
+        lLibros.addEventListener('click',            onLibClick);
+    }
+
+    function deactivateLib() {
+        s4Active = false;
+        hsBiblioteca.classList.remove('active');
+        hsBiblioteca.removeEventListener('mouseenter', onLibEnter);
+        hsBiblioteca.removeEventListener('mouseleave', onLibLeave);
+        hsBiblioteca.removeEventListener('click',      onLibClick);
+        lBiblioteca.style.pointerEvents = 'none';
+        lLibros.style.pointerEvents = 'none';
+        lBiblioteca.removeEventListener('mouseenter',  onLibEnter);
+        lBiblioteca.removeEventListener('mouseleave',  onLibLeave);
+        lBiblioteca.removeEventListener('click',       onLibClick);
+        lLibros.removeEventListener('click',            onLibClick);
+        lBiblioteca.classList.remove('b-breathing', 'b-hvr');
+        lBiblioteca.classList.add('b-stop');
+        lLibros.classList.remove('b-breathing');
+        lLibros.classList.add('b-stop');
+    }
+
+    function onLibEnter() {
+        if (s4Active && !s4InLib) lBiblioteca.classList.add('b-hvr');
+    }
+    function onLibLeave() { lBiblioteca.classList.remove('b-hvr'); }
+
+    /* ── Click en la biblioteca ── */
+    function onLibClick() {
+        if (!s4Active || s4InLib) return;
+        /* Solo permitir si la cama está en estado base (no en medio de animación) */
+        if (typeof window.isBedReady === 'function' && !window.isBedReady()) return;
+        s4InLib = true;
+
+        BedroomAudio.playBookshelf();
+
+        deactivateLib();
+        if (typeof window.pauseScenes === 'function') window.pauseScenes();
+
+        /* Zoom hacia la biblioteca — avance directo, sin barrido */
+        var origin = computeLibOrigin();   /* capturar posición antes del timeout */
+        zoomer.style.transformOrigin = origin;
+        setTimeout(function () {
+            zoomer.style.transition =
+                'transform ' + (S4_ZOOM_DUR / 1000).toFixed(1) + 's cubic-bezier(0.16,0.01,0.08,1.0)';
+            void zoomer.offsetWidth;
+            zoomer.style.transform = 'scale(' + S4_ZOOM_SCALE + ')';
+            setTimeout(activateBooks, S4_ZOOM_DUR + 200);
+        }, 400);
+    }
+
+    /* ══════════════════════════════════════════
+       LIBROS INTERACTIVOS (en zoom de biblioteca)
+    ══════════════════════════════════════════ */
+    function activateBooks() {
+        zoomer.style.transition = 'none';
+        hsBook1.classList.add('active');
+        hsBook1.style.cursor = 'pointer';
+        lLibros.classList.remove('b-stop');
+        void lLibros.offsetWidth;
+        lLibros.classList.add('b-breathing');
+        lLibros.style.pointerEvents = 'auto';
+        lLibros.style.cursor = 'pointer';
+        hsBook1.addEventListener('click', onBookClick);
+        lLibros.addEventListener('click', onBookClick);
+        zoomer.addEventListener('click', onZoomerClickLib);
+    }
+
+    function deactivateBooks() {
+        hsBook1.classList.remove('active');
+        hsBook1.removeEventListener('click', onBookClick);
+        zoomer.removeEventListener('click', onZoomerClickLib);
+    }
+
+    function onZoomerClickLib() {
+        if (!s4InLib) return;
+        startReturnLib();
+    }
+
+    /* ── Posición de la estantería para animación física de vuelo ── */
+    var shelfOffsetX = 0;
+    var shelfOffsetY = 0;
+
+    function calcShelfOffset() {
+        var bookRect = hsBook1 ? hsBook1.getBoundingClientRect() : (lLibros ? lLibros.getBoundingClientRect() : null);
+        if (bookRect && bookRect.width > 0) {
+            var originX = bookRect.left + bookRect.width / 2;
+            var originY = bookRect.top + bookRect.height / 2;
+            shelfOffsetX = originX - (window.innerWidth / 2);
+            shelfOffsetY = originY - (window.innerHeight / 2);
+        } else {
+            shelfOffsetX = window.innerWidth * 0.25;
+            shelfOffsetY = -window.innerHeight * 0.15;
+        }
+    }
+
+    /* ── Click en un libro: sale volando desde los libros al centro ── */
+    function onBookClick(e) {
+        e.stopPropagation();
+        BedroomAudio.playBookOpen();
+        calcShelfOffset();
+        deactivateBooks();
+        openLibro();
+    }
+
+    /* ══════════════════════════════════════════
+       LIBRO OVERLAY — 3 estados
+    ══════════════════════════════════════════ */
+    function resetLibroElements() {
+        if (wrapTapa) {
+            wrapTapa.classList.remove('lb-shown');
+            wrapTapa.style.animation = 'none';
+            wrapTapa.style.transform = '';
+            wrapTapa.style.opacity = '';
+        }
+        if (wrapAbierto) {
+            wrapAbierto.classList.remove('lb-shown');
+            wrapAbierto.style.animation = 'none';
+            wrapAbierto.style.transform = '';
+            wrapAbierto.style.opacity = '';
+        }
+        if (wrapTrasera) {
+            wrapTrasera.classList.remove('lb-shown');
+            wrapTrasera.style.animation = 'none';
+            wrapTrasera.style.transform = '';
+            wrapTrasera.style.opacity = '';
+        }
+        if (libroPageW)      libroPageW.classList.remove('lb-shown');
+        if (libroStickyWrap) libroStickyWrap.classList.remove('lb-shown');
+        if (libroHojaPapel)  libroHojaPapel.classList.remove('lb-shown');
+        if (libroInfo)       libroInfo.classList.remove('lb-shown');
+        if (libroHint)       libroHint.classList.remove('lb-shown');
+        if (libroClose)      libroClose.classList.remove('lb-shown');
+    }
+
+    function openLibro() {
+        lbState = LBOOK.TAPA;
+        BedroomAudio.playBookOpen();
+        resetLibroElements();
+        libroOverlay.classList.add('lb-open');
+
+        /* Fade in backdrop */
+        libroOverlay.style.transition = 'none';
+        libroOverlay.style.opacity    = '0';
+        libroOverlay.style.pointerEvents = 'none';
+        setTimeout(function () {
+            libroOverlay.style.transition = 'opacity 1.0s ease';
+            libroOverlay.style.opacity    = '1';
+        }, 30);
+
+        /* Animación física: Sale de entre medio de los libros (venga chiquito y se agrande hasta el centro) */
+        wrapTapa.style.transition = 'none';
+        wrapTapa.style.transform  = 'translate(calc(-50% + ' + shelfOffsetX + 'px), calc(-50% + ' + shelfOffsetY + 'px)) scale(0.08) rotateY(20deg)';
+        wrapTapa.style.opacity    = '0';
+        wrapTapa.classList.add('lb-shown');
+
+        /* Reflow */
+        void wrapTapa.offsetWidth;
+
+        setTimeout(function () {
+            wrapTapa.style.transition = 'transform 1.1s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.7s ease';
+            wrapTapa.style.transform  = 'translate(-50%, -50%) scale(1) rotateY(0deg)';
+            wrapTapa.style.opacity    = '1';
+        }, 50);
+
+        /* Activar interacción y mostrar controles */
+        setTimeout(function () {
+            libroClose.classList.add('lb-shown');
+            libroClose.addEventListener('click', onLibroCloseClick);
+            libroHint.textContent = '\u2014 toc\u00e1 para abrir \u2014';
+            libroHint.classList.add('lb-shown');
+            libroOverlay.style.pointerEvents = 'auto';
+            libroOverlay.addEventListener('click', onLibroOverlayClick);
+
+            /* Interacción para la Sticky Note (abrir link Chequeado) */
+            if (libroStickyWrap) {
+                libroStickyWrap.onclick = function(e) {
+                    e.stopPropagation();
+                    window.open('https://chequeado.com/el-explicador/el-suicidio-ya-es-la-principal-causa-de-muerte-entre-adolescentes-y-jovenes-adultos-en-argentina/', '_blank');
+                };
+            }
+        }, 1250);
+    }
+
+    function onLibroOverlayClick(e) {
+        if (e.target === libroClose) return;
+        if (libroStickyWrap && (e.target === libroStickyWrap || libroStickyWrap.contains(e.target))) return;
+        if (libroInfo && (e.target === libroInfo || libroInfo.contains(e.target))) return;
+        if (lbState === LBOOK.TAPA)    { openLibroAbierto(); return; }
+        if (lbState === LBOOK.ABIERTO) { openLibroTrasera(); return; }
+        if (lbState === LBOOK.TRASERA) { closeLibro();       return; }
+    }
+
+    function onLibroCloseClick(e) {
+        e.stopPropagation();
+        closeLibro();
+    }
+
+    /* ── Estado 1 → 2: Tapa → Libro abierto (3D physical swing & unfold en el centro) ── */
+    function openLibroAbierto() {
+        lbState = LBOOK.ABIERTO;
+        BedroomAudio.playBookOpen();
+        libroHint.classList.remove('lb-shown');
+        libroOverlay.style.pointerEvents = 'none';
+
+        /* 3D Physical Swing: Tapa gira desde el lomo a -90deg */
+        wrapTapa.style.transition = 'none';
+        wrapTapa.style.animation = 'lbPhysicalOpenFront 0.42s cubic-bezier(0.38, 0.04, 0.25, 1) forwards';
+
+        setTimeout(function () {
+            wrapTapa.classList.remove('lb-shown');
+            wrapTapa.style.animation = 'none';
+
+            /* 3D Physical Unfold: Libro Abierto se despliega de 90deg a 0deg en el centro */
+            wrapAbierto.style.animation = 'lbPhysicalUnfoldOpen 0.45s cubic-bezier(0.12, 0.8, 0.3, 1) forwards';
+            wrapAbierto.classList.add('lb-shown');
+
+            setTimeout(function () {
+                wrapAbierto.style.animation = 'none';
+                wrapAbierto.style.transform = 'translate(-50%, -50%)';
+                /* Mostrar contenido interactivo sobre el libro abierto */
+                if (libroPageW)      libroPageW.classList.add('lb-shown');
+                if (libroStickyWrap) libroStickyWrap.classList.add('lb-shown');
+                if (libroHojaPapel)  libroHojaPapel.classList.add('lb-shown');
+                if (libroInfo)       libroInfo.classList.add('lb-shown');
+                /* Hint de continuar */
+                setTimeout(function () {
+                    libroHint.textContent = '\u2014 toc\u00e1 para continuar \u2014';
+                    libroHint.classList.add('lb-shown');
+                    libroOverlay.style.pointerEvents = 'auto';
+                }, 2200);
+            }, 450);
+        }, 400);
+    }
+
+    /* ── Estado 2 → 3: Libro abierto → Tapa trasera (3D physical fold & swing) ── */
+    function openLibroTrasera() {
+        lbState = LBOOK.TRASERA;
+        BedroomAudio.playPageTurn();
+        libroHint.classList.remove('lb-shown');
+        libroOverlay.style.pointerEvents = 'none';
+
+        /* Quitar elementos interactivos de la página antes del cierre */
+        if (libroPageW)      libroPageW.classList.remove('lb-shown');
+        if (libroStickyWrap) libroStickyWrap.classList.remove('lb-shown');
+        if (libroHojaPapel)  libroHojaPapel.classList.remove('lb-shown');
+        if (libroInfo)       libroInfo.classList.remove('lb-shown');
+
+        /* 3D Physical Fold: Libro Abierto se pliega a -90deg hacia su centro */
+        wrapAbierto.style.animation = 'lbPhysicalFoldOpen 0.42s cubic-bezier(0.38, 0.04, 0.25, 1) forwards';
+
+        setTimeout(function () {
+            wrapAbierto.classList.remove('lb-shown');
+            wrapAbierto.style.animation = 'none';
+
+            /* 3D Physical Swing: Tapa Trasera gira de 90deg a 0deg */
+            wrapTrasera.style.animation = 'lbPhysicalCloseBack 0.45s cubic-bezier(0.12, 0.8, 0.3, 1) forwards';
+            wrapTrasera.classList.add('lb-shown');
+
+            setTimeout(function () {
+                wrapTrasera.style.animation = 'none';
+                wrapTrasera.style.transform = 'translate(-50%, -50%)';
+                /* Hint de cierre */
+                setTimeout(function () {
+                    libroHint.textContent = '\u2014 toc\u00e1 para cerrar \u2014';
+                    libroHint.classList.add('lb-shown');
+                    libroOverlay.style.pointerEvents = 'auto';
+                }, 1200);
+            }, 450);
+        }, 400);
+    }
+
+    /* ── Cerrar overlay → animación de regreso a la estantería ── */
+    function closeLibro() {
+        libroOverlay.removeEventListener('click', onLibroOverlayClick);
+        libroClose.removeEventListener('click', onLibroCloseClick);
+        libroHint.classList.remove('lb-shown');
+        libroClose.classList.remove('lb-shown');
+        libroOverlay.style.pointerEvents = 'none';
+
+        var activeWrap = null;
+        if (lbState === LBOOK.TRASERA) activeWrap = wrapTrasera;
+        else if (lbState === LBOOK.ABIERTO) activeWrap = wrapAbierto;
+        else if (lbState === LBOOK.TAPA) activeWrap = wrapTapa;
+
+        if (activeWrap) {
+            activeWrap.style.transition = 'transform 0.85s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.6s ease';
+            activeWrap.style.transform  = 'translate(calc(-50% + ' + shelfOffsetX + 'px), calc(-50% + ' + shelfOffsetY + 'px)) scale(0.08)';
+            activeWrap.style.opacity    = '0';
+        }
+
+        libroOverlay.style.transition = 'opacity 0.85s ease';
+        libroOverlay.style.opacity    = '0';
+
+        setTimeout(function () {
+            resetLibroElements();
+            lbState = LBOOK.NONE;
+            libroOverlay.style.opacity = '0';
+            libroOverlay.classList.remove('lb-open');
+            if (typeof window.resumeScenes === 'function') window.resumeScenes();
+            activateBooks();
+
+            /* Mostrar botón para continuar a Escena 3 */
+            showBtnEscena3();
+        }, 900);
+    }
+
+    /* ══════════════════════════════════════════
+       VOLVER A HABITACIÓN (sin abrir libro)
+    ══════════════════════════════════════════ */
+    function startReturnLib() {
+        if (!s4InLib) return;
+        s4InLib = false;
+        deactivateBooks();
+        zoomer.style.transition =
+            'transform ' + (S4_ZOOM_BACK / 1000).toFixed(1) + 's cubic-bezier(0.16,0.01,0.08,1.0)';
+        void zoomer.offsetWidth;
+        zoomer.style.transform = 'scale(1)';
+        setTimeout(function () {
+            zoomer.style.transition = 'none';
+            if (typeof window.resumeScenes === 'function') window.resumeScenes();
+            showBtnEscena3();
+        }, S4_ZOOM_BACK + 200);
+    }
+
+    /* ── Mostrar botón para continuar a Escena 3 ── */
+    function showBtnEscena3() {
+        var btn = document.getElementById('btn-to-escena3');
+        if (btn) {
+            btn.classList.add('visible');
+            btn.onclick = function(e) {
+                e.preventDefault();
+                var fade = document.getElementById('intro-fade');
+                if (fade) {
+                    fade.style.transition = 'opacity 1.2s ease';
+                    fade.style.opacity = '1';
+                    fade.classList.remove('gone');
+                }
+                BedroomAudio.fadeOutBgMusic(1200, function() {
+                    window.location.href = 'escena3.html';
+                });
+            };
+        }
+    }
+
+})();
+
+</script>
+
+<!-- ════════════════════════════════════════
+     LIBRO OVERLAY — tapa / abierto + hoja papel / trasera
+════════════════════════════════════════ -->
+<div id="libro-overlay">
+    <div id="libro-backdrop"></div>
+    <div id="libro-stage">
+        <!-- Estado 1: Tapa Delantera -->
+        <div class="lb-3d-wrap" id="wrap-tapa">
+            <img id="libro-tapa" src="libro tapa.png" alt="Tapa Delantera">
+        </div>
+        <!-- Estado 2: Libro abierto + Stick Note pegado + info Chequeado -->
+        <div class="lb-3d-wrap" id="wrap-abierto">
+            <div id="libro-abierto-wrap">
+                <img id="libro-abierto" src="libro abierto.png" alt="Libro Abierto">
+                <a id="libro-sticky-wrapper" href="https://chequeado.com/el-explicador/el-suicidio-ya-es-la-principal-causa-de-muerte-entre-adolescentes-y-jovenes-adultos-en-argentina/" target="_blank" rel="noopener noreferrer" title="Haz clic para leer el artículo en Chequeado">
+                    <img id="libro-hoja-papel" src="stick note.png" alt="Stick Note">
+                </a>
+            </div>
+        </div>
+        <!-- Estado 3: Tapa Trasera -->
+        <div class="lb-3d-wrap" id="wrap-trasera">
+            <img id="libro-trasera" src="libro tapa trasera.png" alt="Tapa Trasera">
+        </div>
+    </div>
+    <div id="libro-hint"></div>
+    <button id="libro-close">&#x2715;</button>
+</div>
+
+</body>
+</html>

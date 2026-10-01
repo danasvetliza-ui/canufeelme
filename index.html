@@ -1,0 +1,698 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Can U Feel Me?</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@1,300;1,400;1,500&display=swap" rel="stylesheet">
+    <style>
+        * { margin:0; padding:0; box-sizing:border-box; }
+        html, body { width:100%; height:100%; overflow:hidden; background:#e8b731; touch-action:none; }
+
+        .scene {
+            position:relative; width:100vw; height:100vh; overflow:hidden;
+            background: url('assets/MANTEL.jpg') center center / cover no-repeat;
+        }
+        .canvas {
+            position:absolute; top:50%; left:50%;
+            width:1376px; height:768px; transform-origin:center;
+        }
+
+        /* ── Title ── */
+        #title-wrap {
+            position:absolute; left:50%; top:50%;
+            transform:translate(-50%,-50%);
+            z-index:1; text-align:center;
+            pointer-events:none; user-select:none;
+            opacity:0.02;
+            transition: opacity 0.4s ease;
+        }
+        #title-wrap.revealed {
+            opacity:1; pointer-events:auto; cursor:pointer;
+            z-index:30;
+        }
+        #title-wrap.revealed:hover .title-line { color:#f8f0e4; }
+        .title-line {
+            font-family:'Cormorant Garamond', Georgia, serif;
+            font-style:italic; font-weight:300;
+            color:#fff; white-space:nowrap;
+            line-height:0.92;
+            text-shadow:0 2px 24px rgba(0,0,0,0.18);
+            letter-spacing:0.14em;
+            transition: color 0.3s ease;
+        }
+        #title-top    { font-size:96px; }
+        #title-bottom { font-size:108px; margin-top:4px; letter-spacing:0.1em; }
+
+        #title-wrap.transitioning {
+            transform: translate(-50%,-50%) scale(1.08) !important;
+            filter: drop-shadow(0 0 35px rgba(255,255,255,0.7));
+            transition: transform 0.8s cubic-bezier(0.22, 1, 0.36, 1), filter 0.8s ease;
+        }
+
+        #transition-curtain {
+            position: fixed; inset: 0; z-index: 9999;
+            background: #0d0018; opacity: 0; pointer-events: none;
+            transition: opacity 0.8s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        #transition-curtain.active {
+            opacity: 1; pointer-events: auto;
+        }
+
+        /* ════════════════════════════════════════════
+           Scene 2 — the room
+           Stage: fixed 1920x1080 design, scaled to viewport.
+           All art is 1920x1080, perfectly aligned.
+           ════════════════════════════════════════════ */
+        #scene2 {
+            display:none; position:fixed; inset:0;
+            background:#000; z-index:200; overflow:hidden;
+        }
+        #scene2.active { display:block; }
+
+        #s2-stage {
+            position:absolute; top:50%; left:50%;
+            width:1920px; height:1080px;
+            transform:translate(-50%,-50%);
+        }
+
+        #s2-zoomer {
+            position:absolute; inset:0;
+            transform-origin: 18% 78%;
+            transition: transform 2.8s cubic-bezier(.22,.04,.12,1);
+            will-change: transform;
+        }
+        #s2-zoomer.zoom-bed { transform: scale(3.15); }
+
+        .s2-img {
+            position:absolute; inset:0;
+            width:100%; height:100%;
+            pointer-events:none; user-select:none;
+            transition: opacity 1.4s ease;
+        }
+
+        #s2-fondo         { z-index:1; }
+        #s2-cama-wide     { z-index:2; }
+        #s2-remedio-wide  { z-index:3; }
+        #s2-almohada-wide { z-index:4; }
+
+        /* Bottle sits under the pillow on the wide bed (Habitación completa as reference) */
+        #s2-remedio-wide {
+            inset:auto;
+            left:26.4%; top:61.5%;
+            width:7.2%; height:auto;
+            transform:translate(-50%,-50%);
+        }
+
+        #s2-cama-wide.pulsing { animation: s2-pulse 1.75s ease-in-out infinite; }
+        @keyframes s2-pulse {
+            0%, 100% { filter: brightness(1); }
+            50%      { filter: brightness(1.28) drop-shadow(0 0 16px rgba(210,180,255,0.45)); }
+        }
+
+        /* Close-up stack: Cama sola + remedio + almohada */
+        #s2-cama-close,
+        #s2-remedio-close,
+        #s2-almohada-close {
+            opacity:0;
+            transition: opacity 0.95s ease;
+        }
+        #s2-cama-close     { z-index:6; }
+        #s2-remedio-close  { z-index:7; }
+        #s2-almohada-close { z-index:8; }
+        #s2-cama-close.shown,
+        #s2-remedio-close.shown,
+        #s2-almohada-close.shown { opacity:1; }
+
+        #s2-remedio-close {
+            inset:auto;
+            left:62%; top:38%;
+            width:17%; height:auto;
+            transform:translate(-50%,-50%);
+        }
+        #s2-almohada-close.pulsing,
+        #s2-remedio-close.pulsing { animation: s2-pulse 1.45s ease-in-out infinite; }
+        #s2-almohada-close.faded,
+        #s2-almohada-wide.faded {
+            opacity:0 !important;
+            animation:none;
+            transition: opacity 1s ease;
+        }
+
+        #s2-inicio {
+            position:absolute; inset:0; width:100%; height:100%;
+            z-index:20; opacity:1;
+            pointer-events:none; user-select:none;
+            transition: opacity 2.8s ease;
+        }
+        #s2-inicio.fade-out { opacity:0; }
+
+        /* Circle at Círculo.png position — barely breathes */
+        #s2-ring {
+            position:absolute; z-index:22;
+            left:50%; top:54.8%;
+            width:46px; height:46px;
+            transform:translate(-50%,-50%);
+            border-radius:50%;
+            box-sizing:border-box;
+            border:1.5px solid rgba(198,255,132,0.55);
+            box-shadow:
+                0 0 6px 0 rgba(170,255,110,0.28),
+                inset 0 0 7px 0 rgba(170,255,110,0.16);
+            background: radial-gradient(circle at 50% 50%,
+                rgba(198,255,132,0.10) 0%,
+                rgba(198,255,132,0.03) 44%,
+                rgba(198,255,132,0) 70%);
+            pointer-events:none;
+            animation: ring-breathe 2.6s ease-in-out infinite;
+        }
+        @keyframes ring-breathe {
+            0%, 100% { opacity:0.16; }
+            50%      { opacity:0.40; }
+        }
+        #s2-ring.off {
+            animation:none;
+            opacity:0 !important;
+            transition: opacity 0.4s ease;
+        }
+        #s2-ring-hotspot {
+            position:absolute; z-index:23;
+            left:50%; top:54.8%;
+            width:88px; height:88px;
+            transform:translate(-50%,-50%);
+            border-radius:50%;
+            cursor:pointer; background:transparent;
+        }
+        #s2-ring-hotspot.off { pointer-events:none; }
+
+        #s2-bed-hotspot {
+            position:absolute; z-index:12;
+            left:0; top:52%;
+            width:40%; height:48%;
+            cursor:pointer; background:transparent;
+            display:none; pointer-events:none;
+        }
+        #s2-bed-hotspot.active { display:block; pointer-events:auto; }
+
+        #s2-pillow-hotspot {
+            position:absolute; z-index:14;
+            left:50%; top:28%;
+            width:30%; height:26%;
+            cursor:pointer; background:transparent;
+            display:none; pointer-events:none;
+        }
+        #s2-pillow-hotspot.active { display:block; pointer-events:auto; }
+
+        #s2-remedio-hotspot {
+            position:absolute; z-index:15;
+            left:53%; top:26%;
+            width:20%; height:28%;
+            cursor:pointer; background:transparent;
+            display:none; pointer-events:none;
+        }
+        #s2-remedio-hotspot.active { display:block; pointer-events:auto; }
+
+        /* ── Blackout (behind remedio-big / gif) ── */
+        #s2-blackout {
+            position:fixed; inset:0; z-index:150;
+            background:#000; opacity:0; pointer-events:none;
+            transition: opacity 0.9s ease;
+        }
+        #s2-blackout.on { opacity:1; }
+
+        /* ── Remedio centered foreground ── */
+        #s2-remedio-big {
+            position:fixed; top:50%; left:50%;
+            transform: translate(-50%,-50%);
+            height:70vh; width:auto; z-index:210;
+            opacity:0; pointer-events:none;
+            transition: opacity 0.9s ease;
+            cursor:pointer;
+        }
+        #s2-remedio-big.visible { opacity:1; pointer-events:auto; }
+
+        /* ── GIF full screen ── */
+        #s2-gif {
+            position:fixed; inset:0;
+            width:100%; height:100%;
+            object-fit:contain;
+            background:#000;
+            z-index:211;
+            opacity:0; pointer-events:none;
+            transition: opacity 0.6s ease;
+        }
+        #s2-gif.visible { opacity:1; }
+
+        /* ── Medications ── */
+        .med {
+            position:absolute; top:0; left:0;
+            width:1376px; height:768px;
+            pointer-events:none; z-index:5;
+        }
+
+        /* pile offsets — wider spread for clearer layering */
+        #blister-1       { transform: translate(-95px,-55px) rotate(-11deg); }
+        #blister-2       { transform: translate(72px,-38px) rotate(8deg); }
+        #blister-3       { transform: translate(-48px,42px) rotate(-5deg); }
+        #blister-4       { transform: translate(88px,28px) rotate(12deg); }
+        #caja-1          { transform: translate(-78px,8px) rotate(-14deg); }
+        #caja-2          { transform: translate(55px,-62px) rotate(9deg); }
+        #caja-3          { transform: translate(-22px,68px) rotate(-7deg); }
+        #caja-4          { transform: translate(38px,52px) rotate(11deg); }
+        #frasco-1        { transform: translate(-62px,-28px) rotate(-8deg); }
+        #frasco-2        { transform: translate(105px,-12px) rotate(14deg); }
+        #frasco-3        { transform: translate(-110px,35px) rotate(-16deg); }
+        #frasco-4        { transform: translate(28px,-48px) rotate(6deg); }
+        #frasco-5        { transform: translate(-35px,78px) rotate(-10deg); }
+        #blister-extra-1 { transform: translate(-125px,-18px) rotate(7deg) scale(0.93); }
+        #blister-extra-2 { transform: translate(118px,55px) rotate(-9deg) scale(0.88); }
+        #blister-extra-3 { transform: translate(18px,-72px) rotate(4deg) scale(0.85); }
+        #blister-extra-4 { transform: translate(132px,-45px) rotate(-6deg) scale(0.90); }
+        #caja-extra-1    { transform: translate(-88px,58px) rotate(6deg) scale(0.88); }
+        #caja-extra-2    { transform: translate(95px,-58px) rotate(-11deg) scale(0.85); }
+        #caja-extra-3    { transform: translate(-58px,-68px) rotate(13deg) scale(0.82); }
+        #caja-extra-4    { transform: translate(72px,18px) rotate(-5deg) scale(0.90); }
+        #frasco-extra-1  { transform: translate(-98px,72px) rotate(10deg) scale(0.85); }
+        #frasco-extra-2  { transform: translate(128px,-28px) rotate(-13deg) scale(0.88); }
+        #frasco-extra-3  { transform: translate(42px,88px) rotate(7deg) scale(0.83); }
+
+        /* ── Hands ── */
+        .hand-img {
+            position:absolute; top:0; left:0;
+            width:1376px; height:768px;
+            z-index:20; pointer-events:none;
+            transform:translateY(768px); opacity:0;
+        }
+
+        /* ── Grab targets (invisible, over hand graphics) ── */
+        .grab {
+            position:absolute; z-index:25;
+            cursor:grab; transform:translateY(768px);
+        }
+        .grab:active { cursor:grabbing; }
+        #grab-izq { left:30px; top:200px; width:450px; height:570px; }
+        #grab-der { left:720px; top:80px;  width:530px; height:690px; }
+    </style>
+</head>
+<body>
+    <div class="scene">
+        <div class="canvas" id="canvas">
+            <!-- Title (z:1, behind meds) -->
+            <div id="title-wrap">
+                <div class="title-line" id="title-top">CAN U</div>
+                <div class="title-line" id="title-bottom">FEEL ME?</div>
+            </div>
+
+            <!-- Medications (z:5) -->
+            <img class="med" id="blister-1"       src="assets/blister 1.png">
+            <img class="med" id="blister-2"       src="assets/blister 2.png">
+            <img class="med" id="blister-3"       src="assets/Blister 3.png">
+            <img class="med" id="blister-4"       src="assets/blister 4.png">
+            <img class="med" id="caja-1"          src="assets/Caja 1.png">
+            <img class="med" id="caja-2"          src="assets/caja 2.png">
+            <img class="med" id="caja-3"          src="assets/CAja 3.png">
+            <img class="med" id="caja-4"          src="assets/caja 4.png">
+            <img class="med" id="frasco-1"        src="assets/Frasco 1.png">
+            <img class="med" id="frasco-2"        src="assets/Frasco 2.png">
+            <img class="med" id="frasco-3"        src="assets/Frasco 3.png">
+            <img class="med" id="frasco-4"        src="assets/Frasco 4.png">
+            <img class="med" id="frasco-5"        src="assets/Frasco 5.png">
+            <img class="med" id="blister-extra-1" src="assets/blister 1.png">
+            <img class="med" id="blister-extra-2" src="assets/blister 4.png">
+            <img class="med" id="blister-extra-3" src="assets/Blister 3.png">
+            <img class="med" id="blister-extra-4" src="assets/blister 2.png">
+            <img class="med" id="caja-extra-1"    src="assets/Caja 1.png">
+            <img class="med" id="caja-extra-2"    src="assets/caja 2.png">
+            <img class="med" id="caja-extra-3"    src="assets/CAja 3.png">
+            <img class="med" id="caja-extra-4"    src="assets/caja 4.png">
+            <img class="med" id="frasco-extra-1"  src="assets/Frasco 3.png">
+            <img class="med" id="frasco-extra-2"  src="assets/Frasco 4.png">
+            <img class="med" id="frasco-extra-3"  src="assets/Frasco 1.png">
+
+            <!-- Hands (z:20) -->
+            <img class="hand-img" id="mano-izq" src="assets/mano izq.png">
+            <img class="hand-img" id="mano-der" src="assets/mano derecha.png">
+
+            <!-- Grab targets (z:25) -->
+            <div class="grab" id="grab-izq"></div>
+            <div class="grab" id="grab-der"></div>
+        </div>
+    </div>
+
+    <div id="scene2">
+        <div id="s2-stage">
+            <div id="s2-zoomer">
+                <img class="s2-img" id="s2-fondo" src="Fondo sin cama.png" alt="">
+                <img class="s2-img" id="s2-cama-wide" src="Cama sin almohada.png" alt="">
+                <img class="s2-img" id="s2-remedio-wide" src="Remedio.png" alt="">
+                <img class="s2-img" id="s2-almohada-wide" src="Almohada.png" alt="">
+
+                <img class="s2-img" id="s2-cama-close" src="Cama sola.png" alt="">
+                <img class="s2-img" id="s2-remedio-close" src="Remedio.png" alt="">
+                <img class="s2-img" id="s2-almohada-close" src="Cama almohada.png" alt="">
+
+                <img class="s2-img" id="s2-inicio" src="Inicio final.png" alt="">
+                <div id="s2-ring"></div>
+                <div id="s2-ring-hotspot"></div>
+                <div id="s2-bed-hotspot"></div>
+                <div id="s2-pillow-hotspot"></div>
+                <div id="s2-remedio-hotspot"></div>
+            </div>
+        </div>
+        <div id="s2-blackout"></div>
+        <img id="s2-remedio-big" src="Remedio.png" alt="">
+        <img id="s2-gif" src="PASTILLA SIN FONDO.gif" alt="">
+    </div>
+
+    <div id="transition-curtain"></div>
+
+<script>
+/* ══════════════════════════════════════
+   Scale
+   ══════════════════════════════════════ */
+var scale = 1;
+function scaleCanvas() {
+    scale = Math.max(window.innerWidth / 1376, window.innerHeight / 768);
+    document.getElementById('canvas').style.transform = 'translate(-50%,-50%) scale(' + scale + ')';
+}
+scaleCanvas();
+window.addEventListener('resize', scaleCanvas);
+
+/* Scene 2 stage scale (1920x1080 design) */
+var s2Scale = 1;
+function scaleStage() {
+    s2Scale = Math.max(window.innerWidth / 1920, window.innerHeight / 1080);
+    document.getElementById('s2-stage').style.transform =
+        'translate(-50%,-50%) scale(' + s2Scale + ')';
+}
+scaleStage();
+window.addEventListener('resize', scaleStage);
+
+/* ══════════════════════════════════════
+   Coords: viewport → canvas
+   ══════════════════════════════════════ */
+function toCanvas(cx, cy) {
+    return {
+        x: (cx - window.innerWidth  / 2) / scale + 688,
+        y: (cy - window.innerHeight / 2) / scale + 384
+    };
+}
+
+/* ══════════════════════════════════════
+   Elements
+   ══════════════════════════════════════ */
+var izqImg  = document.getElementById('mano-izq');
+var derImg  = document.getElementById('mano-der');
+var grabIzq = document.getElementById('grab-izq');
+var grabDer = document.getElementById('grab-der');
+var titleWrap = document.getElementById('title-wrap');
+
+/* ══════════════════════════════════════
+   Medication data
+   ══════════════════════════════════════ */
+var MEDS = [
+    { id:'blister-1',       px:-95,  py:-55, pr:-11, ps:1    },
+    { id:'blister-2',       px: 72,  py:-38, pr:  8, ps:1    },
+    { id:'blister-3',       px:-48,  py: 42, pr: -5, ps:1    },
+    { id:'blister-4',       px: 88,  py: 28, pr: 12, ps:1    },
+    { id:'caja-1',          px:-78,  py:  8, pr:-14, ps:1    },
+    { id:'caja-2',          px: 55,  py:-62, pr:  9, ps:1    },
+    { id:'caja-3',          px:-22,  py: 68, pr: -7, ps:1    },
+    { id:'caja-4',          px: 38,  py: 52, pr: 11, ps:1    },
+    { id:'frasco-1',        px:-62,  py:-28, pr: -8, ps:1    },
+    { id:'frasco-2',        px:105,  py:-12, pr: 14, ps:1    },
+    { id:'frasco-3',        px:-110, py: 35, pr:-16, ps:1    },
+    { id:'frasco-4',        px: 28,  py:-48, pr:  6, ps:1    },
+    { id:'frasco-5',        px:-35,  py: 78, pr:-10, ps:1    },
+    { id:'blister-extra-1', px:-125, py:-18, pr:  7, ps:0.93 },
+    { id:'blister-extra-2', px:118,  py: 55, pr: -9, ps:0.88 },
+    { id:'blister-extra-3', px: 18,  py:-72, pr:  4, ps:0.85 },
+    { id:'blister-extra-4', px:132,  py:-45, pr: -6, ps:0.90 },
+    { id:'caja-extra-1',    px:-88,  py: 58, pr:  6, ps:0.88 },
+    { id:'caja-extra-2',    px: 95,  py:-58, pr:-11, ps:0.85 },
+    { id:'caja-extra-3',    px:-58,  py:-68, pr: 13, ps:0.82 },
+    { id:'caja-extra-4',    px: 72,  py: 18, pr: -5, ps:0.90 },
+    { id:'frasco-extra-1',  px:-98,  py: 72, pr: 10, ps:0.85 },
+    { id:'frasco-extra-2',  px:128,  py:-28, pr:-13, ps:0.88 },
+    { id:'frasco-extra-3',  px: 42,  py: 88, pr:  7, ps:0.83 }
+];
+
+MEDS.forEach(function(m) {
+    m.el = document.getElementById(m.id);
+    m.pushX = 0;
+    m.pushY = 0;
+});
+
+var CENTER_X = 688;
+var CENTER_Y = 384;
+var TEXT_RX = 250;
+var TEXT_RY = 170;
+var TEXT_FAR_MARGIN = 1.45; // todas deben quedar bien lejos del sector del texto
+
+function medPos(m) {
+    return { x: CENTER_X + m.px + m.pushX, y: CENTER_Y + m.py + m.pushY };
+}
+
+function medDistFromText(m) {
+    var p = medPos(m);
+    var dx = (p.x - CENTER_X) / TEXT_RX;
+    var dy = (p.y - CENTER_Y) / TEXT_RY;
+    return Math.sqrt(dx * dx + dy * dy);
+}
+
+function isMedFarFromTextZone(m) {
+    return medDistFromText(m) > TEXT_FAR_MARGIN;
+}
+
+function allMedsFarFromText() {
+    for (var i = 0; i < MEDS.length; i++) {
+        if (!isMedFarFromTextZone(MEDS[i])) return false;
+    }
+    return true;
+}
+
+function countMedsFarFromText() {
+    var n = 0;
+    MEDS.forEach(function(m) {
+        if (isMedFarFromTextZone(m)) n++;
+    });
+    return n;
+}
+
+/* ══════════════════════════════════════
+   Hand state
+   ══════════════════════════════════════ */
+var handOff = { 'mano-izq': {x:0,y:0}, 'mano-der': {x:0,y:0} };
+// Push-zone origins (fingertip area, canvas coords before offset)
+var pushOrigin = { 'mano-izq': {x:340, y:320}, 'mano-der': {x:920, y:270} };
+
+var dragging   = null;
+var dragStart  = null;
+var dragHandStart = null;
+var ready           = false;
+var textSectorClear = false;
+var finaleStarted   = false;
+var allCleared      = false;
+var exitTimer       = null;
+
+/* ══════════════════════════════════════
+   Update medication transform
+   ══════════════════════════════════════ */
+function updateMed(m) {
+    var tx  = m.px + m.pushX;
+    var ty  = m.py + m.pushY;
+    var rot = m.pr + m.pushX * 0.08;
+    var sc  = m.ps !== 1 ? ' scale(' + m.ps + ')' : '';
+    m.el.style.transform = 'translate(' + tx + 'px,' + ty + 'px) rotate(' + rot + 'deg)' + sc;
+    m.el.style.opacity = '1';
+}
+
+function updateTitleOpacity() {
+    if (textSectorClear) return;
+    var far = countMedsFarFromText();
+    var p = far / MEDS.length;
+    titleWrap.style.opacity = 0.02 + 0.98 * p;
+}
+
+/* ══════════════════════════════════════
+   Push check
+   ══════════════════════════════════════ */
+var PUSH_R = 175;
+function checkPush(handId) {
+    var off = handOff[handId];
+    var ori = pushOrigin[handId];
+    var hx  = ori.x + off.x;
+    var hy  = ori.y + off.y;
+
+    MEDS.forEach(function(m) {
+        var p = medPos(m);
+        var dx = p.x - hx;
+        var dy = p.y - hy;
+        var dist = Math.sqrt(dx * dx + dy * dy);
+        if (dist < PUSH_R && dist > 1) {
+            var force = (PUSH_R - dist) * 0.32;
+            var nx = dx / dist;
+            var ny = dy / dist;
+            m.pushX += nx * force;
+            m.pushY += ny * force;
+            updateMed(m);
+        }
+    });
+    updateTitleOpacity();
+}
+
+/* ══════════════════════════════════════
+   Move hand (img + grab target)
+   ══════════════════════════════════════ */
+function setHandTransform(handId, tx, ty, transition) {
+    var img  = handId === 'mano-izq' ? izqImg  : derImg;
+    var grab = handId === 'mano-izq' ? grabIzq : grabDer;
+    var t = 'translate(' + tx + 'px,' + ty + 'px)';
+    if (transition) {
+        img.style.transition  = transition;
+        grab.style.transition = transition;
+    } else {
+        img.style.transition  = 'none';
+        grab.style.transition = 'none';
+    }
+    img.style.transform  = t;
+    grab.style.transform = t;
+}
+
+/* ══════════════════════════════════════
+   Drag handlers
+   ══════════════════════════════════════ */
+function onDown(handId, ex, ey) {
+    if (!ready || textSectorClear) return;
+    dragging = handId;
+    dragStart = toCanvas(ex, ey);
+    dragHandStart = { x: handOff[handId].x, y: handOff[handId].y };
+}
+function onMove(ex, ey) {
+    if (!dragging) return;
+    var pos = toCanvas(ex, ey);
+    var dx = pos.x - dragStart.x;
+    var dy = pos.y - dragStart.y;
+    handOff[dragging].x = dragHandStart.x + dx;
+    handOff[dragging].y = dragHandStart.y + dy;
+    setHandTransform(dragging, handOff[dragging].x, handOff[dragging].y);
+    checkPush(dragging);
+    checkTextSectorClear();
+}
+function onUp() {
+    if (dragging) checkTextSectorClear();
+    dragging = null;
+}
+
+// Mouse
+grabIzq.addEventListener('mousedown', function(e) { onDown('mano-izq', e.clientX, e.clientY); e.preventDefault(); });
+grabDer.addEventListener('mousedown', function(e) { onDown('mano-der', e.clientX, e.clientY); e.preventDefault(); });
+window.addEventListener('mousemove', function(e) { onMove(e.clientX, e.clientY); });
+window.addEventListener('mouseup', onUp);
+
+// Touch
+grabIzq.addEventListener('touchstart', function(e) { onDown('mano-izq', e.touches[0].clientX, e.touches[0].clientY); e.preventDefault(); });
+grabDer.addEventListener('touchstart', function(e) { onDown('mano-der', e.touches[0].clientX, e.touches[0].clientY); e.preventDefault(); });
+window.addEventListener('touchmove',  function(e) { if (dragging) { onMove(e.touches[0].clientX, e.touches[0].clientY); e.preventDefault(); } }, {passive:false});
+window.addEventListener('touchend', onUp);
+
+/* ══════════════════════════════════════
+   Todas lejos del texto → esperar 5s → manos bajan lento
+   ══════════════════════════════════════ */
+function checkTextSectorClear() {
+    if (textSectorClear || finaleStarted) return;
+    if (!allMedsFarFromText()) return;
+
+    textSectorClear = true;
+    titleWrap.style.opacity = '1';
+
+    exitTimer = setTimeout(startHandExit, 5000);
+}
+
+function startHandExit() {
+    if (finaleStarted) return;
+    finaleStarted = true;
+    allCleared = true;
+
+    var izqX = handOff['mano-izq'].x;
+    var izqY = handOff['mano-izq'].y;
+    var derX = handOff['mano-der'].x;
+    var derY = handOff['mano-der'].y;
+
+    var slide = 'transform 6s cubic-bezier(.22,.03,.15,1), opacity 4s ease 2.5s';
+    izqImg.style.transition  = slide;
+    derImg.style.transition  = slide;
+    grabIzq.style.transition = slide;
+    grabDer.style.transition = slide;
+
+    izqImg.style.transform  = 'translate(' + izqX + 'px,' + (izqY + 680) + 'px)';
+    derImg.style.transform  = 'translate(' + derX + 'px,' + (derY + 680) + 'px)';
+    grabIzq.style.transform = 'translate(' + izqX + 'px,' + (izqY + 680) + 'px)';
+    grabDer.style.transform = 'translate(' + derX + 'px,' + (derY + 680) + 'px)';
+    izqImg.style.opacity  = '0';
+    derImg.style.opacity  = '0';
+    grabIzq.style.opacity = '0';
+    grabDer.style.opacity = '0';
+
+    setTimeout(function() {
+        titleWrap.classList.add('revealed');
+    }, 4200);
+}
+
+/* ══════════════════════════════════════
+   Scene 2
+   ══════════════════════════════════════ */
+var s2Started       = false;
+var bedReady        = false;
+var almohadaShown   = false;
+var gifShown        = false;
+
+var curtain = document.getElementById('transition-curtain');
+var isNavigating = false;
+
+function goToScene2() {
+    if (isNavigating) return;
+    isNavigating = true;
+    titleWrap.classList.add('transitioning');
+    if (curtain) curtain.classList.add('active');
+    setTimeout(function() {
+        window.location.href = 'escena2.html';
+    }, 750);
+}
+titleWrap.addEventListener('click', function() {
+    if (allCleared) goToScene2();
+});
+
+
+
+/* ══════════════════════════════════════
+   Hand entry (slow, organic)
+   ══════════════════════════════════════ */
+setTimeout(function() {
+    izqImg.style.transition  = 'transform 3s cubic-bezier(.08,.45,.25,1), opacity 0.6s ease';
+    grabIzq.style.transition = 'transform 3s cubic-bezier(.08,.45,.25,1)';
+    izqImg.style.transform  = 'translate(0,0)';
+    izqImg.style.opacity    = '1';
+    grabIzq.style.transform = 'translate(0,0)';
+}, 500);
+setTimeout(function() {
+    derImg.style.transition  = 'transform 3.2s cubic-bezier(.08,.45,.25,1), opacity 0.6s ease';
+    grabDer.style.transition = 'transform 3.2s cubic-bezier(.08,.45,.25,1)';
+    derImg.style.transform  = 'translate(0,0)';
+    derImg.style.opacity    = '1';
+    grabDer.style.transform = 'translate(0,0)';
+}, 700);
+
+// Hands ready after entry
+setTimeout(function() {
+    izqImg.style.transition  = 'none';
+    derImg.style.transition  = 'none';
+    grabIzq.style.transition = 'none';
+    grabDer.style.transition = 'none';
+    ready = true;
+}, 4200);
+</script>
+</body>
+</html>

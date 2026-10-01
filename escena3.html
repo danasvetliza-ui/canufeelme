@@ -1,0 +1,578 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Can U Feel Me? — Escena 3</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Courier+Prime:ital,wght@0,400;0,700;1,400&family=Special+Elite&display=swap" rel="stylesheet">
+    <style>
+        * { margin:0; padding:0; box-sizing:border-box; }
+        html, body {
+            width: 100%; height: 100%;
+            overflow-x: hidden;
+            overflow-y: auto;
+            background: #090214;
+            font-family: 'Special Elite', 'Courier Prime', monospace;
+            color: #f3e8ff;
+            user-select: none;
+            -webkit-user-select: none;
+            scrollbar-width: thin;
+            scrollbar-color: rgba(138, 64, 229, 0.4) transparent;
+        }
+
+        /* ═══════════════════════════════════════════════════════
+           BACKGROUND & BLUR ATMOSPHERE (VIOLETA OSCURO + LILAS)
+        ═══════════════════════════════════════════════════════ */
+        #bg-canvas {
+            position: fixed; inset: 0;
+            z-index: 0;
+            background: radial-gradient(circle at 50% 50%, #16072b 0%, #080112 100%);
+            overflow: hidden;
+        }
+
+        /* Esferas de luz lilac flotantes blureadas */
+        .orb {
+            position: absolute;
+            border-radius: 50%;
+            filter: blur(100px);
+            opacity: 0.50;
+            will-change: transform;
+            animation: orbFloat 16s ease-in-out infinite alternate;
+        }
+        .orb-1 {
+            width: 600px; height: 600px;
+            background: #8a40e5;
+            top: -120px; left: -100px;
+            animation-duration: 18s;
+        }
+        .orb-2 {
+            width: 700px; height: 700px;
+            background: #4c1c8c;
+            bottom: -180px; right: -120px;
+            animation-duration: 22s;
+            animation-delay: -6s;
+        }
+        .orb-3 {
+            width: 480px; height: 480px;
+            background: #c49aff;
+            top: 35%; left: 30%;
+            filter: blur(120px);
+            opacity: 0.30;
+            animation-duration: 14s;
+            animation-delay: -3s;
+        }
+
+        @keyframes orbFloat {
+            0%   { transform: translate(0, 0) scale(1); }
+            50%  { transform: translate(45px, -35px) scale(1.08); }
+            100% { transform: translate(-35px, 45px) scale(0.94); }
+        }
+
+        /* Viñeta atmosférica suave */
+        #grain-overlay {
+            position: fixed; inset: 0;
+            z-index: 1;
+            background: radial-gradient(circle at 50% 50%, transparent 35%, rgba(5, 1, 12, 0.78) 100%);
+            pointer-events: none;
+        }
+
+        /* ═══════════════════════════════════════════════════════
+           CENTER CONTAINER & TEXTO MAQUINA DE ESCRIBIR
+        ═══════════════════════════════════════════════════════ */
+        #scene-container {
+            position: relative;
+            min-height: 100vh;
+            z-index: 10;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 40px 20px 100px 20px;
+        }
+
+        #typewriter-box {
+            position: relative;
+            max-width: 1150px;
+            width: 95vw;
+            text-align: center;
+            margin-bottom: 28px;
+            line-height: 1.45;
+        }
+
+        #typewriter-text {
+            font-family: 'Special Elite', 'Courier Prime', monospace;
+            font-size: clamp(20px, 3.4vw, 46px);
+            color: #f3e8ff;
+            text-shadow: 0 0 28px rgba(212, 178, 255, 0.55), 0 2px 8px rgba(0, 0, 0, 0.7);
+            letter-spacing: 0.05em;
+            display: inline;
+        }
+
+        /* Bloques indivisibles para garantizar 1 sola línea o 2 líneas equilibradas */
+        .tw-part {
+            display: inline-block;
+            white-space: nowrap;
+        }
+
+        /* Caret / Cursor de máquina de escribir */
+        .caret {
+            display: inline-block;
+            width: 0.52em;
+            height: 1.1em;
+            background: #d4b2ff;
+            margin-left: 4px;
+            vertical-align: middle;
+            box-shadow: 0 0 14px #b886fd;
+            animation: caretBlink 0.85s step-end infinite;
+        }
+        .caret.typing {
+            animation: none;
+            opacity: 1;
+        }
+
+        @keyframes caretBlink {
+            0%, 100% { opacity: 1; }
+            50%      { opacity: 0; }
+        }
+
+        /* Key hit pop micro-animación al escribir cada carácter */
+        .key-char {
+            display: inline-block;
+            opacity: 0;
+            transform: scale(1.25) translateY(-2px);
+            animation: keyPop 0.18s cubic-bezier(0.1, 0.9, 0.2, 1) forwards;
+        }
+        @keyframes keyPop {
+            100% { opacity: 1; transform: scale(1) translateY(0); }
+        }
+
+        /* ═══════════════════════════════════════════════════════
+           SECCIÓN DE ASISTENCIA Y LÍNEAS EN SALUD MENTAL (BS. AS.)
+        ═══════════════════════════════════════════════════════ */
+        .helpline-card {
+            max-width: 860px;
+            width: 90vw;
+            background: rgba(18, 7, 36, 0.48);
+            backdrop-filter: blur(20px) saturate(160%);
+            -webkit-backdrop-filter: blur(20px) saturate(160%);
+            border: 1px solid rgba(224, 195, 252, 0.18);
+            border-radius: 20px;
+            padding: 28px 32px;
+            box-shadow: 
+                0 20px 60px rgba(5, 1, 14, 0.65),
+                inset 0 0 35px rgba(196, 154, 255, 0.05);
+            opacity: 0;
+            transform: translateY(22px);
+            transition: opacity 1.2s ease, transform 1.2s cubic-bezier(0.16, 1, 0.3, 1);
+            pointer-events: none;
+        }
+        .helpline-card.shown {
+            opacity: 1;
+            transform: translateY(0);
+            pointer-events: auto;
+        }
+
+        .hl-header {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+
+        .hl-badge {
+            display: inline-block;
+            font-family: 'Courier Prime', monospace;
+            font-size: 11px;
+            font-weight: 700;
+            letter-spacing: 0.22em;
+            color: #d4b2ff;
+            background: rgba(138, 64, 229, 0.25);
+            border: 1px solid rgba(212, 178, 255, 0.30);
+            padding: 4px 12px;
+            border-radius: 20px;
+            text-transform: uppercase;
+            margin-bottom: 10px;
+        }
+
+        .hl-title {
+            font-family: 'Special Elite', 'Courier Prime', monospace;
+            font-size: clamp(16px, 1.8vw, 22px);
+            color: #ffffff;
+            letter-spacing: 0.04em;
+            margin-bottom: 6px;
+        }
+
+        .hl-desc {
+            font-family: 'Courier Prime', -apple-system, sans-serif;
+            font-size: clamp(12px, 1.1vw, 14px);
+            line-height: 1.45;
+            color: rgba(243, 232, 255, 0.78);
+            max-width: 680px;
+            margin: 0 auto;
+        }
+
+        .hl-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+            gap: 16px;
+            margin-top: 20px;
+            width: 100%;
+        }
+
+        .hl-item {
+            display: flex;
+            flex-direction: column;
+            align-items: flex-start;
+            justify-content: space-between;
+            gap: 12px;
+            background: rgba(30, 12, 58, 0.60);
+            border: 1px solid rgba(224, 195, 252, 0.20);
+            padding: 18px 20px;
+            border-radius: 16px;
+            text-decoration: none;
+            color: inherit;
+            box-sizing: border-box;
+            width: 100%;
+            transition: all 0.28s cubic-bezier(0.22, 1, 0.36, 1);
+        }
+        .hl-item:hover {
+            background: rgba(138, 64, 229, 0.35);
+            border-color: rgba(224, 195, 252, 0.50);
+            transform: translateY(-3px);
+            box-shadow: 0 8px 26px rgba(138, 64, 229, 0.35);
+        }
+
+        .hl-num {
+            font-family: 'Special Elite', monospace;
+            font-size: clamp(16px, 1.4vw, 21px);
+            font-weight: bold;
+            color: #ffffff;
+            background: rgba(138, 64, 229, 0.40);
+            border: 1px solid rgba(224, 195, 252, 0.35);
+            padding: 6px 14px;
+            border-radius: 10px;
+            white-space: nowrap;
+            letter-spacing: 0.04em;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.25), 0 0 12px rgba(184, 134, 253, 0.35);
+        }
+
+        .hl-info {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            width: 100%;
+            min-width: 0;
+        }
+
+        .hl-info strong {
+            font-family: 'Courier Prime', monospace;
+            font-size: clamp(13px, 1.0vw, 15px);
+            color: #ffffff;
+            font-weight: 700;
+            line-height: 1.35;
+            word-break: break-word;
+        }
+
+        .hl-info span {
+            font-family: 'Courier Prime', -apple-system, sans-serif;
+            font-size: clamp(11.5px, 0.85vw, 13px);
+            color: rgba(243, 232, 255, 0.78);
+            line-height: 1.4;
+            word-break: break-word;
+        }
+
+        /* ═══════════════════════════════════════════════════════
+           CONTROLES INFERIORES
+        ═══════════════════════════════════════════════════════ */
+        .nav-bar {
+            margin-top: 30px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-wrap: wrap;
+            gap: 16px;
+            z-index: 20;
+            opacity: 0;
+            transform: translateY(12px);
+            transition: opacity 1.2s ease, transform 1.2s ease;
+        }
+        .nav-bar.visible {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        .btn-action {
+            background: rgba(22, 9, 42, 0.60);
+            border: 1px solid rgba(224, 195, 252, 0.22);
+            color: rgba(243, 232, 255, 0.80);
+            padding: 10px 20px;
+            border-radius: 20px;
+            font-family: 'Courier Prime', monospace;
+            font-size: 12px;
+            letter-spacing: 0.15em;
+            cursor: pointer;
+            text-decoration: none;
+            transition: all 0.3s ease;
+            backdrop-filter: blur(10px);
+        }
+        .btn-action:hover {
+            background: rgba(138, 64, 229, 0.35);
+            color: #ffffff;
+            border-color: rgba(224, 195, 252, 0.50);
+            transform: translateY(-2px);
+            box-shadow: 0 4px 16px rgba(138, 64, 229, 0.30);
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Fondo de violeta oscuro y lilas blureados -->
+    <div id="bg-canvas">
+        <div class="orb orb-1"></div>
+        <div class="orb orb-2"></div>
+        <div class="orb orb-3"></div>
+    </div>
+    <div id="grain-overlay"></div>
+
+    <!-- Contenedor central -->
+    <div id="scene-container">
+        <!-- Texto de máquina de escribir (partes indivisibles para 1 o 2 líneas) -->
+        <div id="typewriter-box">
+            <div id="typewriter-text"><span id="tw-part1" class="tw-part"></span><span id="tw-part2" class="tw-part"></span></div><span class="caret" id="caret"></span>
+        </div>
+
+        <!-- Tarjeta de Asistencia y Salud Mental (Buenos Aires, Argentina) -->
+        <div id="helpline-section" class="helpline-card">
+            <div class="hl-header">
+                <span class="hl-badge">ASISTENCIA 24 HS · BUENOS AIRES, ARGENTINA</span>
+                <h3 class="hl-title">Líneas gratuitas de contención y salud mental</h3>
+                <p class="hl-desc">Si vos o alguien que conocés está atravesando un momento difícil, no estás solo/a. Hay contención profesional gratuita y confidencial las 24 horas.</p>
+            </div>
+            <div class="hl-grid">
+                <a href="tel:135" class="hl-item" title="Llamar al 135 (Centro de Asistencia al Suicida)">
+                    <div class="hl-num">135</div>
+                    <div class="hl-info">
+                        <strong>Centro de Asistencia al Suicida (CAS)</strong>
+                        <span>Gratis desde CABA y GBA · 24 hs</span>
+                    </div>
+                </a>
+                <a href="tel:08003451435" class="hl-item" title="Llamar al 0800-345-1435">
+                    <div class="hl-num">0800-345-1435</div>
+                    <div class="hl-info">
+                        <strong>CAS — Todo el País</strong>
+                        <span>Línea nacional gratuita 24 hs</span>
+                    </div>
+                </a>
+                <a href="tel:08009990091" class="hl-item" title="Llamar al 0800-999-0091">
+                    <div class="hl-num">0800-999-0091</div>
+                    <div class="hl-info">
+                        <strong>Salud Mental Nación</strong>
+                        <span>Ministerio de Salud Argentina · 24 hs</span>
+                    </div>
+                </a>
+                <a href="tel:108" class="hl-item" title="Llamar a Línea 108 Opción 3">
+                    <div class="hl-num">108 (Op. 3)</div>
+                    <div class="hl-info">
+                        <strong>Salud Mental CABA</strong>
+                        <span>Línea 108 / 0800-999-2345 · 24 hs</span>
+                    </div>
+                </a>
+            </div>
+        </div>
+
+        <div class="nav-bar" id="nav-bar">
+            <button class="btn-action" id="btn-replay">⟳ VOLVER A ESCRIBIR</button>
+            <a href="escena2.html" class="btn-action">← ANTERIOR</a>
+        </div>
+    </div>
+
+<script>
+(function() {
+    'use strict';
+
+    /* ── Frase dividida en 2 bloques indivisibles para formato perfecto de 1 o 2 líneas ── */
+    var PART1 = "No puedo curarte, ";
+    var PART2 = "pero puedo quedarme con vos";
+    var FULL_TEXT = PART1 + PART2;
+    var TYPING_SPEED_MIN = 85;  // ms por tecla
+    var TYPING_SPEED_MAX = 150; // ms por tecla
+
+    /* ── Elementos DOM ── */
+    var twPart1         = document.getElementById('tw-part1');
+    var twPart2         = document.getElementById('tw-part2');
+    var caret           = document.getElementById('caret');
+    var helplineSection = document.getElementById('helpline-section');
+    var navBar          = document.getElementById('nav-bar');
+    var btnReplay       = document.getElementById('btn-replay');
+
+    /* ── Web Audio API Synthesizer para ruido de teclas de máquina de escribir ── */
+    var audioCtx = null;
+
+    function initAudioContext() {
+        if (!audioCtx) {
+            var AudioContext = window.AudioContext || window.webkitAudioContext;
+            if (AudioContext) {
+                audioCtx = new AudioContext();
+            }
+        }
+        if (audioCtx && audioCtx.state === 'suspended') {
+            audioCtx.resume().catch(function(){});
+        }
+    }
+
+    /* Reproduce ruido mecánico realista de cada tecla */
+    function playKeySound(char) {
+        initAudioContext();
+        if (!audioCtx) return;
+        var t = audioCtx.currentTime;
+
+        var isSpace  = (char === ' ');
+        var isPeriod = (char === '.' || char === ',');
+
+        // 1. Impacto ruidoso de la tecla golpeando el papel
+        var bufferSize = Math.floor(audioCtx.sampleRate * (isSpace ? 0.05 : 0.035));
+        var buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
+        var data = buffer.getChannelData(0);
+        for (var i = 0; i < bufferSize; i++) {
+            data[i] = (Math.random() * 2 - 1) * Math.exp(-i / (bufferSize * 0.28));
+        }
+
+        var noise = audioCtx.createBufferSource();
+        noise.buffer = buffer;
+
+        var filter = audioCtx.createBiquadFilter();
+        filter.type = isSpace ? 'lowpass' : 'bandpass';
+        filter.frequency.setValueAtTime(isSpace ? 340 : (isPeriod ? 1900 : 1250 + Math.random() * 450), t);
+        if (!isSpace) filter.Q.setValueAtTime(2.8, t);
+
+        var noiseGain = audioCtx.createGain();
+        var vol = isSpace ? 0.22 : (isPeriod ? 0.36 : 0.30);
+        noiseGain.gain.setValueAtTime(vol, t);
+        noiseGain.gain.exponentialRampToValueAtTime(0.001, t + (isSpace ? 0.05 : 0.035));
+
+        noise.connect(filter);
+        filter.connect(noiseGain);
+        noiseGain.connect(audioCtx.destination);
+        noise.start(t);
+
+        // 2. Golpe de la palanca metálica de la máquina
+        var osc = audioCtx.createOscillator();
+        var oscGain = audioCtx.createGain();
+        osc.type = 'triangle';
+        var freq = isSpace ? 110 : (isPeriod ? 520 : 260 + Math.random() * 90);
+        osc.frequency.setValueAtTime(freq, t);
+        osc.frequency.exponentialRampToValueAtTime(freq * 0.35, t + 0.04);
+
+        oscGain.gain.setValueAtTime(isSpace ? 0.14 : 0.11, t);
+        oscGain.gain.exponentialRampToValueAtTime(0.001, t + 0.04);
+
+        osc.connect(oscGain);
+        oscGain.connect(audioCtx.destination);
+        osc.start(t);
+        osc.stop(t + 0.045);
+
+        // 3. Campana final al presionar el punto final o coma
+        if (isPeriod) {
+            playCarriageBell(t + 0.04);
+        }
+    }
+
+    /* Campana vintage de máquina de escribir al terminar */
+    function playCarriageBell(t) {
+        if (!audioCtx) return;
+        var bellOsc = audioCtx.createOscillator();
+        var bellGain = audioCtx.createGain();
+        bellOsc.type = 'sine';
+        bellOsc.frequency.setValueAtTime(1560, t);
+        
+        bellGain.gain.setValueAtTime(0.22, t);
+        bellGain.gain.exponentialRampToValueAtTime(0.0001, t + 0.95);
+
+        bellOsc.connect(bellGain);
+        bellGain.connect(audioCtx.destination);
+        bellOsc.start(t);
+        bellOsc.stop(t + 1.0);
+    }
+
+    /* ── Lógica de la animación de máquina de escribir ── */
+    var charIndex = 0;
+    var typingTimer = null;
+    var isTyping = false;
+
+    function startTypewriter() {
+        if (isTyping) return;
+        isTyping = true;
+        charIndex = 0;
+        twPart1.innerHTML = '';
+        twPart2.innerHTML = '';
+        helplineSection.classList.remove('shown');
+        navBar.classList.remove('visible');
+        caret.classList.add('typing');
+
+        typeNextChar();
+    }
+
+    function typeNextChar() {
+        if (charIndex < FULL_TEXT.length) {
+            var char = FULL_TEXT.charAt(charIndex);
+
+            // Crear span animado para cada letra
+            var span = document.createElement('span');
+            span.className = 'key-char';
+            span.textContent = char === ' ' ? '\u00A0' : char;
+
+            if (charIndex < PART1.length) {
+                twPart1.appendChild(span);
+            } else {
+                twPart2.appendChild(span);
+            }
+
+            // Sonido de tecla
+            playKeySound(char);
+
+            charIndex++;
+
+            // Calcular pausa aleatoria orgánica entre teclas
+            var delay = Math.floor(Math.random() * (TYPING_SPEED_MAX - TYPING_SPEED_MIN)) + TYPING_SPEED_MIN;
+            if (char === ',' || char === '—') delay += 220;
+            if (char === ' ') delay += 60;
+
+            typingTimer = setTimeout(typeNextChar, delay);
+        } else {
+            // Typing completado → Mostrar líneas de asistencia y controles
+            isTyping = false;
+            caret.classList.remove('typing');
+            setTimeout(function() {
+                helplineSection.classList.add('shown');
+                navBar.classList.add('visible');
+            }, 600);
+        }
+    }
+
+    // Inicializar audio al primer toque/click en la página por si el navegador bloquea Autoplay
+    function userUnlockAudio() {
+        initAudioContext();
+        window.removeEventListener('click', userUnlockAudio);
+        window.removeEventListener('keydown', userUnlockAudio);
+        window.removeEventListener('touchstart', userUnlockAudio);
+    }
+    window.addEventListener('click', userUnlockAudio);
+    window.addEventListener('keydown', userUnlockAudio);
+    window.addEventListener('touchstart', userUnlockAudio);
+
+    // Iniciar automáticamente al cargar la página
+    window.addEventListener('DOMContentLoaded', function() {
+        setTimeout(startTypewriter, 300);
+    });
+
+    btnReplay.addEventListener('click', function(e) {
+        e.stopPropagation();
+        if (typingTimer) clearTimeout(typingTimer);
+        isTyping = false;
+        startTypewriter();
+    });
+
+})();
+</script>
+</body>
+</html>
